@@ -1,0 +1,14 @@
+{
+  "name": "auto-thumbnail-bot",
+  "version": "3.0.0",
+  "description": "Auto Thumbnail Generator with Smart Capture",
+  "main": "thumbnail_bot.js",
+  "scripts": {
+    "start": "node thumbnail_bot.js"
+  },
+  "dependencies": {
+    "puppeteer": "^22.0.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}
