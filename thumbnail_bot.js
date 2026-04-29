@@ -10,7 +10,7 @@ const fs = require('fs');
 // ==========================================
 const TARGET_URL = process.env.TARGET_URL || 'https://dlstreams.com/watch.php?id=316';
 const IMAGE_PREFIX = process.env.IMAGE_PREFIX || 'Live_Thumbnail'; 
-const WAIT_TIME_MS = 30 * 1000; // 30 Seconds Wait Time
+const WAIT_TIME_MS = 30 * 1000; // 30 Seconds
 const RELEASE_TAG = 'live-match-updates'; 
 
 let browser = null;
@@ -18,8 +18,21 @@ let videoPage = null;
 let renderPage = null; 
 let cycleCounter = 1;
 
+// 🛠️ DEBUG HELPER FUNCTION
+async function uploadDebugSnapshot(page, filename, description) {
+    console.log(`[🔍 DEBUG] Taking snapshot: ${description}...`);
+    try {
+        await page.screenshot({ path: filename, type: 'jpeg', quality: 80 });
+        execSync(`gh release upload ${RELEASE_TAG} "${filename}"`, { stdio: 'inherit' });
+        console.log(`[🔍 DEBUG] Uploaded: ${filename}`);
+        if (fs.existsSync(filename)) fs.unlinkSync(filename); // Clean up after upload
+    } catch (e) {
+        console.log(`[❌ DEBUG] Failed to upload ${filename}: ${e.message}`);
+    }
+}
+
 async function setupStream() {
-    console.log(`[*] Starting browser with GPU disabled for screenshot capture...`);
+    console.log(`[*] Starting browser for Debugging...`);
     
     browser = await puppeteer.launch({
         channel: 'chrome', 
@@ -29,10 +42,10 @@ async function setupStream() {
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',             // 🔥 FIX: Prevent memory crash
-            '--disable-gpu',                       // 🔥 FIX: Force Software Rendering
-            '--disable-accelerated-video-decode',  // 🔥 FIX: Allow video screenshot
-            '--disable-software-rasterizer',       // 🔥 FIX: WebGL fallback
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-accelerated-video-decode',
+            '--disable-software-rasterizer',
             '--window-size=1280,720',
             '--kiosk', 
             '--autoplay-policy=no-user-gesture-required',
@@ -48,13 +61,11 @@ async function setupStream() {
         if (p !== videoPage && p !== renderPage) await p.close();
     }
 
-    // 🛑 POPUP & REDIRECT BLOCKER
     browser.on('targetcreated', async (target) => {
         if (target.type() === 'page') {
             try {
                 const newPage = await target.page();
                 if (newPage && newPage !== videoPage && newPage !== renderPage) {
-                    console.log(`[!] Ad Popup KILLED! Focus maintained on stream.`);
                     await videoPage.bringToFront(); 
                     await newPage.close();
                 }
@@ -67,7 +78,7 @@ async function setupStream() {
     await new Promise(r => setTimeout(r, 8000)); 
 
     // 🖱️ THE TERMINATOR CLICKER
-    console.log('[*] Hunting for the Play Button (20 Seconds window)...');
+    console.log('[*] Hunting for the Play Button...');
     for (let attempts = 0; attempts < 10; attempts++) {
         let clickedInThisAttempt = false;
         
@@ -91,11 +102,14 @@ async function setupStream() {
         }
         
         if (clickedInThisAttempt) {
-            await new Promise(r => setTimeout(r, 3000)); 
+            await new Promise(r => setTimeout(r, 5000)); // Thora extra wait kiya video play hone ka
         } else {
             await new Promise(r => setTimeout(r, 2000)); 
         }
     }
+
+    // 📸 DEBUG 1: RAW SCREENSHOT AFTER PLAY CLICK
+    await uploadDebugSnapshot(videoPage, 'debug_1_after_click.jpg', 'Right after hitting Play');
 
     // ⬛ IMMEDIATE BLACK BACKGROUND & FULLSCREEN FORCE
     console.log('[*] Enforcing Black Background and Full Screen UI...');
@@ -109,7 +123,6 @@ async function setupStream() {
         });
     }).catch(() => {});
 
-    // 🔥 SMART APPLY: Apply UI hider to ALL frames
     for (const frame of videoPage.frames()) {
         try {
             await frame.evaluate(() => {
@@ -127,6 +140,11 @@ async function setupStream() {
             });
         } catch (e) {} 
     }
+
+    await new Promise(r => setTimeout(r, 3000));
+
+    // 📸 DEBUG 2: RAW SCREENSHOT AFTER UI CHANGES
+    await uploadDebugSnapshot(videoPage, 'debug_2_after_ui.jpg', 'After Black Background & Zoom applied');
 
     console.log('[✅] Stream is successfully set up! Starting Thumbnail Loop...');
 }
@@ -166,6 +184,10 @@ async function captureAndUpload() {
         console.log(`[📸] Taking raw screenshot of stream...`);
         await videoPage.screenshot({ path: rawFrame, type: 'jpeg', quality: 90 });
 
+        // 📸 DEBUG 3: UPLOAD RAW FRAME FROM LOOP DIRECTLY
+        execSync(`gh release upload ${RELEASE_TAG} "${rawFrame}"`, { stdio: 'inherit' });
+        console.log(`[🔍 DEBUG] Uploaded Raw Loop Frame: ${rawFrame}`);
+
         console.log(`[🎨] Generating HD Thumbnail with template...`);
         const b64Image = "data:image/jpeg;base64," + fs.readFileSync(rawFrame).toString('base64');
         
@@ -177,7 +199,7 @@ async function captureAndUpload() {
 
         console.log(`[📤] Uploading ${finalImage} to GitHub Release (${RELEASE_TAG})...`);
         execSync(`gh release upload ${RELEASE_TAG} "${finalImage}"`, { stdio: 'inherit' });
-        console.log(`✅ [+] Successfully ADDED to ${RELEASE_TAG}!`);
+        console.log(`✅ [+] Successfully ADDED FINAL THUMBNAIL to ${RELEASE_TAG}!`);
 
     } catch (err) {
         console.log(`[❌] Error in capture cycle: ${err.message}`);
