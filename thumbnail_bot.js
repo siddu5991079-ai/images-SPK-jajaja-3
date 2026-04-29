@@ -19,7 +19,7 @@ let renderPage = null;
 let cycleCounter = 1;
 
 async function setupStream() {
-    console.log(`[*] Starting browser with Project 2 Robust Settings...`);
+    console.log(`[*] Starting browser with GPU disabled for screenshot capture...`);
     
     browser = await puppeteer.launch({
         channel: 'chrome', 
@@ -29,6 +29,10 @@ async function setupStream() {
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',             // 🔥 FIX: Prevent memory crash
+            '--disable-gpu',                       // 🔥 FIX: Force Software Rendering
+            '--disable-accelerated-video-decode',  // 🔥 FIX: Allow video screenshot
+            '--disable-software-rasterizer',       // 🔥 FIX: WebGL fallback
             '--window-size=1280,720',
             '--kiosk', 
             '--autoplay-policy=no-user-gesture-required',
@@ -60,24 +64,17 @@ async function setupStream() {
 
     console.log(`[*] Navigating to: ${TARGET_URL}`);
     await videoPage.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await new Promise(r => setTimeout(r, 8000)); // Thora wait kiya taake iframe ban jaye
+    await new Promise(r => setTimeout(r, 8000)); 
 
-    // ====================================================================
-    // 🖱️ THE TERMINATOR CLICKER (🔥 100% FIXED & ROBUST)
-    // ====================================================================
+    // 🖱️ THE TERMINATOR CLICKER
     console.log('[*] Hunting for the Play Button (20 Seconds window)...');
-    
-    // 10 attempts lagayenge (har attempt ke baad 2 se 3 sec wait karenge)
     for (let attempts = 0; attempts < 10; attempts++) {
         let clickedInThisAttempt = false;
         
         for (const frame of videoPage.frames()) {
             try {
-                // Aapka exact aria-label wala selector:
                 const playBtn = await frame.$('.jw-icon-display[aria-label="Play"]');
-                
                 if (playBtn) {
-                    // Check karega ke button chupa hua toh nahi
                     const isVisible = await frame.evaluate(el => {
                         const style = window.getComputedStyle(el);
                         return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
@@ -87,21 +84,18 @@ async function setupStream() {
                         console.log(`[*] Play button smashed! (Attempt ${attempts + 1}/10)`);
                         await frame.evaluate(el => el.click(), playBtn); 
                         clickedInThisAttempt = true;
-                        break; // Ek frame mein click mil gaya toh baqi iframes ko filhal chor do
+                        break; 
                     }
                 }
             } catch (err) {}
         }
         
         if (clickedInThisAttempt) {
-            // Agar click kiya hai, toh 3 second wait karo (ho sakta hai popup block ho, ya video play hone me time le)
             await new Promise(r => setTimeout(r, 3000)); 
         } else {
-            // Agar button is dafa nahi mila, toh matlab ya toh chupa hua hai, ya abhi tak page load kar raha hai. 2 sec wait karke wapis loop mein try karega!
             await new Promise(r => setTimeout(r, 2000)); 
         }
     }
-    // ====================================================================
 
     // ⬛ IMMEDIATE BLACK BACKGROUND & FULLSCREEN FORCE
     console.log('[*] Enforcing Black Background and Full Screen UI...');
