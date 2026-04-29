@@ -24,11 +24,11 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    # 🔥 FIX: FFMPEG YAHAN ADD KIYA HAI TAHO X11GRAB CHAL SAKE
-    - name: Install System Tools (Chrome, Xvfb & FFmpeg)
+    # 🔥 EXACT PROJECT 2 SYSTEM TOOLS (Audio + FFmpeg)
+    - name: Install System Tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y google-chrome-stable xvfb ffmpeg
+        sudo apt-get install -y google-chrome-stable xvfb ffmpeg pulseaudio dbus-x11
 
     - name: Setup Node.js
       uses: actions/setup-node@v3
@@ -47,4 +47,10 @@ jobs:
         TARGET_URL: ${{ inputs.target_url }}
         IMAGE_PREFIX: ${{ inputs.image_prefix }}
       run: |
+        # 🔥 EXACT PROJECT 2 AUDIO SERVER STARTUP
+        pulseaudio -D --exit-idle-time=-1
+        pacmd load-module module-virtual-sink sink_name=v1
+        pacmd set-default-sink v1
+        pacmd set-default-source v1.monitor
+        
         xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac" node thumbnail_bot.js
