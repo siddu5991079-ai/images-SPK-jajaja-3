@@ -24,10 +24,11 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    - name: Install System Tools (Chrome & Xvfb)
+    # 🔥 FIX: FFMPEG YAHAN ADD KIYA HAI TAHO X11GRAB CHAL SAKE
+    - name: Install System Tools (Chrome, Xvfb & FFmpeg)
       run: |
         sudo apt-get update
-        sudo apt-get install -y google-chrome-stable xvfb
+        sudo apt-get install -y google-chrome-stable xvfb ffmpeg
 
     - name: Setup Node.js
       uses: actions/setup-node@v3
@@ -37,7 +38,6 @@ jobs:
     - name: Install Node Libraries
       run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth
 
-    # GitHub CLI needs token to authenticate for release uploads
     - name: Authenticate GitHub CLI
       run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
