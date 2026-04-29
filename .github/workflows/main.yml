@@ -35,9 +35,9 @@ jobs:
       with:
         node-version: '18'
 
-    # ✅ FIXED: Added puppeteer-screen-recorder here!
+    # ✅ FIXED: Added puppeteer-screen-recorder and --legacy-peer-deps to fix version conflict
     - name: Install Node Libraries
-      run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-screen-recorder
+      run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-screen-recorder --legacy-peer-deps
 
     - name: Authenticate GitHub CLI
       run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
