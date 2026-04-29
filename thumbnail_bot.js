@@ -18,38 +18,21 @@ let videoPage = null;
 let renderPage = null; 
 let cycleCounter = 1;
 
-// 🛠️ DEBUG HELPER FUNCTION
-async function uploadDebugSnapshot(page, filename, description) {
-    console.log(`[🔍 DEBUG] Taking snapshot: ${description}...`);
-    try {
-        await page.screenshot({ path: filename, type: 'jpeg', quality: 80 });
-        execSync(`gh release upload ${RELEASE_TAG} "${filename}"`, { stdio: 'inherit' });
-        console.log(`[🔍 DEBUG] Uploaded: ${filename}`);
-        if (fs.existsSync(filename)) fs.unlinkSync(filename); // Clean up after upload
-    } catch (e) {
-        console.log(`[❌ DEBUG] Failed to upload ${filename}: ${e.message}`);
-    }
-}
-
 async function setupStream() {
-    console.log(`[*] Starting browser for Debugging...`);
+    console.log(`[*] Starting browser with EXACT Project 2 Settings...`);
     
     browser = await puppeteer.launch({
         channel: 'chrome', 
         headless: false, 
         defaultViewport: { width: 1280, height: 720 },
         ignoreDefaultArgs: ['--enable-automation'], 
+        // 🔥 WAPIS PROJECT 2 WALE ARGS LAGA DIYE (Taky stream naturally play ho)
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-accelerated-video-decode',
-            '--disable-software-rasterizer',
             '--window-size=1280,720',
             '--kiosk', 
-            '--autoplay-policy=no-user-gesture-required',
-            '--mute-audio' 
+            '--autoplay-policy=no-user-gesture-required'
         ]
     });
 
@@ -61,11 +44,13 @@ async function setupStream() {
         if (p !== videoPage && p !== renderPage) await p.close();
     }
 
+    // 🛑 POPUP & REDIRECT BLOCKER
     browser.on('targetcreated', async (target) => {
         if (target.type() === 'page') {
             try {
                 const newPage = await target.page();
                 if (newPage && newPage !== videoPage && newPage !== renderPage) {
+                    console.log(`[!] Ad Popup KILLED! Focus maintained on stream.`);
                     await videoPage.bringToFront(); 
                     await newPage.close();
                 }
@@ -102,14 +87,11 @@ async function setupStream() {
         }
         
         if (clickedInThisAttempt) {
-            await new Promise(r => setTimeout(r, 5000)); // Thora extra wait kiya video play hone ka
+            await new Promise(r => setTimeout(r, 5000)); 
         } else {
             await new Promise(r => setTimeout(r, 2000)); 
         }
     }
-
-    // 📸 DEBUG 1: RAW SCREENSHOT AFTER PLAY CLICK
-    await uploadDebugSnapshot(videoPage, 'debug_1_after_click.jpg', 'Right after hitting Play');
 
     // ⬛ IMMEDIATE BLACK BACKGROUND & FULLSCREEN FORCE
     console.log('[*] Enforcing Black Background and Full Screen UI...');
@@ -132,7 +114,7 @@ async function setupStream() {
 
                 const video = document.querySelector('video');
                 if (video) { 
-                    video.muted = true; 
+                    video.muted = true; // Still keep muted 
                     video.style.position = 'fixed'; video.style.top = '0'; video.style.left = '0';
                     video.style.width = '100vw'; video.style.height = '100vh';
                     video.style.zIndex = '2147483647'; video.style.backgroundColor = 'black'; video.style.objectFit = 'contain';
@@ -140,11 +122,6 @@ async function setupStream() {
             });
         } catch (e) {} 
     }
-
-    await new Promise(r => setTimeout(r, 3000));
-
-    // 📸 DEBUG 2: RAW SCREENSHOT AFTER UI CHANGES
-    await uploadDebugSnapshot(videoPage, 'debug_2_after_ui.jpg', 'After Black Background & Zoom applied');
 
     console.log('[✅] Stream is successfully set up! Starting Thumbnail Loop...');
 }
@@ -154,7 +131,6 @@ async function captureAndUpload() {
     console.log(`--- 🔄 STARTING THUMBNAIL CYCLE #${cycleCounter} ---`);
     console.log(`--------------------------------------------------`);
 
-    // 🔥 THE DYNAMIC WATCHDOG
     let isStreamHealthy = false;
     for (const frame of videoPage.frames()) {
         try {
@@ -181,12 +157,19 @@ async function captureAndUpload() {
     const finalImage = `${IMAGE_PREFIX}_${uniqueTime}.png`;
     
     try {
-        console.log(`[📸] Taking raw screenshot of stream...`);
-        await videoPage.screenshot({ path: rawFrame, type: 'jpeg', quality: 90 });
+        console.log(`[📸] Taking raw screenshot using FFmpeg (The Magic Fix)...`);
+        
+        // Ensure video is in front before capturing virtual screen
+        await videoPage.bringToFront();
+        await new Promise(r => setTimeout(r, 1000));
 
-        // 📸 DEBUG 3: UPLOAD RAW FRAME FROM LOOP DIRECTLY
-        execSync(`gh release upload ${RELEASE_TAG} "${rawFrame}"`, { stdio: 'inherit' });
-        console.log(`[🔍 DEBUG] Uploaded Raw Loop Frame: ${rawFrame}`);
+        // 🔥 THE GENIUS FIX: Use FFmpeg to grab the screen just like Project 2!
+        const displayNum = process.env.DISPLAY || ':99';
+        execSync(`ffmpeg -y -f x11grab -draw_mouse 0 -video_size 1280x720 -i ${displayNum} -vframes 1 "${rawFrame}"`, { stdio: 'ignore' });
+
+        if (!fs.existsSync(rawFrame)) {
+            throw new Error("FFmpeg failed to create the raw image.");
+        }
 
         console.log(`[🎨] Generating HD Thumbnail with template...`);
         const b64Image = "data:image/jpeg;base64," + fs.readFileSync(rawFrame).toString('base64');
@@ -195,6 +178,8 @@ async function captureAndUpload() {
 
         await renderPage.setViewport({ width: 1280, height: 720 });
         await renderPage.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
+        
+        // Puppeteer rendering tab ka background mein screenshot le lega bina usko aagay laaye
         await renderPage.screenshot({ path: finalImage });
 
         console.log(`[📤] Uploading ${finalImage} to GitHub Release (${RELEASE_TAG})...`);
