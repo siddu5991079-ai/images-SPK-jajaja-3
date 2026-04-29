@@ -15,6 +15,7 @@ const RELEASE_TAG = 'live-match-updates';
 
 let browser = null;
 let videoPage = null;
+let renderPage = null; // 🔥 NAYA: Pre-created rendering tab
 let targetFrame = null;
 let cycleCounter = 1;
 
@@ -32,22 +33,25 @@ async function setupStream() {
             '--window-size=1280,720',
             '--kiosk', // Fullscreen no UI
             '--autoplay-policy=no-user-gesture-required',
-            '--mute-audio' // Muted for thumbnail generation
+            '--mute-audio' 
         ]
     });
 
     videoPage = await browser.newPage();
+    renderPage = await browser.newPage(); // 🔥 Pehle se hi tab bana liya taake popup blocker isko Ad na samjhe
+
     const pages = await browser.pages();
     for (const p of pages) {
-        if (p !== videoPage) await p.close();
+        if (p !== videoPage && p !== renderPage) await p.close();
     }
 
-    // 🛑 POPUP & REDIRECT BLOCKER (From Project 2)
+    // 🛑 POPUP & REDIRECT BLOCKER (Upgraded)
     browser.on('targetcreated', async (target) => {
         if (target.type() === 'page') {
             try {
                 const newPage = await target.page();
-                if (newPage && newPage !== videoPage) {
+                // 🔥 Agar naya tab videoPage ya renderPage nahi hai, toh wo Ad hai! Ura do!
+                if (newPage && newPage !== videoPage && newPage !== renderPage) {
                     console.log(`[!] Ad Popup KILLED! Focus maintained on stream.`);
                     await videoPage.bringToFront(); 
                     await newPage.close();
@@ -60,7 +64,7 @@ async function setupStream() {
     await videoPage.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await new Promise(r => setTimeout(r, 8000));
 
-    // 🖱️ THE TERMINATOR CLICKER (From Project 2)
+    // 🖱️ THE TERMINATOR CLICKER
     console.log('[*] Hunting for the Play Button...');
     let buttonGone = false;
     for (let attempts = 0; attempts < 15; attempts++) {
@@ -83,7 +87,7 @@ async function setupStream() {
         }
     }
 
-    // 🧠 THE SMART SCANNER (From Project 2)
+    // 🧠 THE SMART SCANNER
     console.log('[*] Scanning for REAL Live Stream Video...');
     for (const frame of videoPage.frames()) {
         try {
@@ -152,6 +156,7 @@ async function captureAndUpload() {
     
     try {
         console.log(`[📸] Taking raw screenshot of stream...`);
+        // videoPage se screen lenge taake sirf video aaye
         await videoPage.screenshot({ path: rawFrame, type: 'jpeg', quality: 90 });
 
         console.log(`[🎨] Generating HD Thumbnail with template...`);
@@ -159,12 +164,11 @@ async function captureAndUpload() {
         
         const htmlCode = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&display=swap" rel="stylesheet"><style>body { margin: 0; width: 1280px; height: 720px; background: #0f0f0f; font-family: 'Roboto', sans-serif; color: white; display: flex; flex-direction: column; overflow: hidden; } .header { height: 100px; display: flex; align-items: center; padding: 0 40px; justify-content: space-between; z-index: 10; } .logo { font-size: 50px; font-weight: 900; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255,255,255,0.8); } .live-badge { border: 4px solid #cc0000; border-radius: 12px; padding: 5px 20px; font-size: 40px; font-weight: 700; display: flex; gap: 10px; } .hero-container { position: relative; width: 100%; height: 440px; } .hero-img { width: 100%; height: 100%; object-fit: cover; filter: blur(5px); opacity: 0.6; } .pip-img { position: absolute; top: 20px; right: 40px; width: 45%; border: 6px solid white; box-shadow: -15px 15px 30px rgba(0,0,0,0.8); } .text-container { position: relative; z-index: 999; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px 40px; } .main-title { font-size: 70px; font-weight: 900; line-height: 1.1; text-shadow: 6px 6px 15px rgba(0,0,0,0.9); } .live-text { color: #cc0000; }</style></head><body><div class="header"><div class="logo">SPORTSHUB</div><div class="live-badge"><span style="color:#cc0000">●</span> LIVE</div></div><div class="hero-container"><img src="${b64Image}" class="hero-img"><img src="${b64Image}" class="pip-img"></div><div class="text-container"><div class="main-title"><span class="live-text">🔴 Watch Live : </span>bulbul4u-live.xyz</div></div></body></html>`;
 
-        // ✨ SMART TAB LOGIC: Use a separate hidden tab to render HTML to avoid stopping the video!
-        const renderTab = await browser.newPage();
-        await renderTab.setViewport({ width: 1280, height: 720 });
-        await renderTab.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
-        await renderTab.screenshot({ path: finalImage });
-        await renderTab.close();
+        // ✨ SMART TAB LOGIC: Pehle se bane hue renderPage ko use karenge
+        await renderPage.setViewport({ width: 1280, height: 720 });
+        await renderPage.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
+        await renderPage.screenshot({ path: finalImage });
+        // Hum renderPage ko close nahi karenge, usay next cycle mein reuse karenge!
 
         console.log(`[📤] Uploading ${finalImage} to GitHub Release (${RELEASE_TAG})...`);
         execSync(`gh release upload ${RELEASE_TAG} "${finalImage}"`, { stdio: 'inherit' });
