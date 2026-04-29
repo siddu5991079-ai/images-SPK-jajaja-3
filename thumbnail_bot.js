@@ -26,7 +26,6 @@ async function setupStream() {
         headless: false, 
         defaultViewport: { width: 1280, height: 720 },
         ignoreDefaultArgs: ['--enable-automation'], 
-        // 🔥 WAPIS PROJECT 2 WALE ARGS LAGA DIYE (Taky stream naturally play ho)
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -114,7 +113,7 @@ async function setupStream() {
 
                 const video = document.querySelector('video');
                 if (video) { 
-                    video.muted = true; // Still keep muted 
+                    video.muted = true; 
                     video.style.position = 'fixed'; video.style.top = '0'; video.style.left = '0';
                     video.style.width = '100vw'; video.style.height = '100vh';
                     video.style.zIndex = '2147483647'; video.style.backgroundColor = 'black'; video.style.objectFit = 'contain';
@@ -159,16 +158,21 @@ async function captureAndUpload() {
     try {
         console.log(`[📸] Taking raw screenshot using FFmpeg (The Magic Fix)...`);
         
-        // Ensure video is in front before capturing virtual screen
         await videoPage.bringToFront();
         await new Promise(r => setTimeout(r, 1000));
 
-        // 🔥 THE GENIUS FIX: Use FFmpeg to grab the screen just like Project 2!
         const displayNum = process.env.DISPLAY || ':99';
-        execSync(`ffmpeg -y -f x11grab -draw_mouse 0 -video_size 1280x720 -i ${displayNum} -vframes 1 "${rawFrame}"`, { stdio: 'ignore' });
+        
+        // 🔥 ERROR LOGGING ADDED HERE + FRAMERATE FIX
+        try {
+            execSync(`ffmpeg -y -f x11grab -draw_mouse 0 -framerate 1 -video_size 1280x720 -i ${displayNum} -vframes 1 "${rawFrame}"`, { stdio: 'pipe' });
+        } catch (ffmpegErr) {
+            console.log(`\n[❌ FFmpeg CRASH REPORT]:\n${ffmpegErr.stderr ? ffmpegErr.stderr.toString() : ffmpegErr.message}\n`);
+            throw new Error("FFmpeg failed to create the raw image. Check logs above.");
+        }
 
         if (!fs.existsSync(rawFrame)) {
-            throw new Error("FFmpeg failed to create the raw image.");
+            throw new Error("FFmpeg command ran but no image was saved.");
         }
 
         console.log(`[🎨] Generating HD Thumbnail with template...`);
@@ -179,7 +183,6 @@ async function captureAndUpload() {
         await renderPage.setViewport({ width: 1280, height: 720 });
         await renderPage.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
         
-        // Puppeteer rendering tab ka background mein screenshot le lega bina usko aagay laaye
         await renderPage.screenshot({ path: finalImage });
 
         console.log(`[📤] Uploading ${finalImage} to GitHub Release (${RELEASE_TAG})...`);
