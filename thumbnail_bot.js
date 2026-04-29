@@ -9,47 +9,49 @@ const fs = require('fs');
 // ⚙️ SETTINGS & ENVIRONMENT VARIABLES
 // ==========================================
 const TARGET_URL = process.env.TARGET_URL || 'https://dlstreams.com/watch.php?id=316';
-const IMAGE_PREFIX = process.env.IMAGE_PREFIX || 'Live_Thumbnail';
-const WAIT_TIME_MS = 30 * 1000;
-const RELEASE_TAG = 'live-match-updates';
+const IMAGE_PREFIX = process.env.IMAGE_PREFIX || 'Live_Thumbnail'; 
+const WAIT_TIME_MS = 30 * 1000; 
+const RELEASE_TAG = 'live-match-updates'; 
 
 let browser = null;
 let videoPage = null;
-let renderPage = null;
+let renderPage = null; 
+let targetFrame = null; // Smart Watchdog ke liye Global 
 let cycleCounter = 1;
 
 async function setupStream() {
-    console.log(`[*] Starting browser with CPU Natural Settings...`);
+    console.log(`[*] Starting browser with EXACT Project 2 Settings...`);
     
+    // 100% COPY PASTE FROM PROJECT 2
     browser = await puppeteer.launch({
-        channel: 'chrome',
-        headless: false,
+        headless: false, 
         defaultViewport: { width: 1280, height: 720 },
-        ignoreDefaultArgs: ['--enable-automation'],
+        ignoreDefaultArgs: ['--enable-automation'], 
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--window-size=1280,720',
-            '--kiosk',
+            '--kiosk', 
             '--autoplay-policy=no-user-gesture-required'
         ]
     });
 
     videoPage = await browser.newPage();
-    renderPage = await browser.newPage();
+    renderPage = await browser.newPage(); // Extra tab for thumbnails
 
     const pages = await browser.pages();
     for (const p of pages) {
         if (p !== videoPage && p !== renderPage) await p.close();
     }
 
+    // 🛑 POPUP & REDIRECT BLOCKER (Project 2 Wali)
     browser.on('targetcreated', async (target) => {
         if (target.type() === 'page') {
             try {
                 const newPage = await target.page();
                 if (newPage && newPage !== videoPage && newPage !== renderPage) {
-                    console.log(`[!] Ad Popup KILLED!`);
-                    await videoPage.bringToFront();
+                    console.log(`[!] Ad Popup detected and KILLED! Focus maintained.`);
+                    await videoPage.bringToFront(); 
                     await newPage.close();
                 }
             } catch (e) {}
@@ -58,40 +60,65 @@ async function setupStream() {
 
     console.log(`[*] Navigating to: ${TARGET_URL}`);
     await videoPage.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await new Promise(r => setTimeout(r, 8000));
+    
+    // EXACT PROJECT 2 WAIT TIME
+    await new Promise(r => setTimeout(r, 5000));
 
-    // 🖱️ THE RELIABLE PROJECT 2 CLICKER
-    console.log('[*] Hunting for the Play Button...');
-    for (let attempts = 0; attempts < 10; attempts++) {
-        let clickedInThisAttempt = false;
-        
+    // 🖱️ THE TERMINATOR CLICKER (100% COPY PASTE FROM PROJECT 2)
+    console.log('[*] Hunting for the JW Player Play Button...');
+    let buttonGone = false;
+    let attempts = 0;
+    
+    while (!buttonGone && attempts < 15) {
+        buttonGone = true;
         for (const frame of videoPage.frames()) {
             try {
-                const playBtn = await frame.$('.jw-icon-display[aria-label="Play"], .plyr__control--overlaid');
+                const playBtn = await frame.$('.jw-icon-display[aria-label="Play"]');
                 if (playBtn) {
                     const isVisible = await frame.evaluate(el => {
                         const style = window.getComputedStyle(el);
                         return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
                     }, playBtn);
-                    
+
                     if (isVisible) {
-                        console.log(`[*] Play button smashed! (Attempt ${attempts + 1}/10)`);
-                        await frame.evaluate(el => el.click(), playBtn);
-                        clickedInThisAttempt = true;
-                        break;
+                        buttonGone = false;
+                        console.log(`[*] Play button detected! Smashing it... (Attempt ${attempts + 1}/15)`);
+                        await frame.evaluate(el => el.click(), playBtn); 
+                        await new Promise(r => setTimeout(r, 2000));
+                        break; 
                     }
                 }
             } catch (err) {}
         }
-        
-        if (clickedInThisAttempt) {
-            await new Promise(r => setTimeout(r, 5000));
-        } else {
-            await new Promise(r => setTimeout(r, 2000));
-        }
+        attempts++;
     }
 
-    // ⬛ IMMEDIATE BLACK BACKGROUND & FULLSCREEN FORCE
+    // 🧠 THE SMART SCANNER (100% COPY PASTE FROM PROJECT 2)
+    console.log('[*] Scanning iframes for the REAL Live Stream Video...');
+    targetFrame = null;
+    for (const frame of videoPage.frames()) {
+        try {
+            const isRealLiveStream = await frame.evaluate(() => {
+                const vid = document.querySelector('video');
+                if (!vid) return false;
+                if (vid.clientWidth < 100 || vid.clientHeight < 100) return false; 
+                return true; 
+            });
+
+            if (isRealLiveStream) {
+                targetFrame = frame;
+                console.log(`[+] Smart Scanner locked onto video frame: ${frame.url().substring(0, 50)}...`);
+                break;
+            }
+        } catch (e) { }
+    }
+
+    if (!targetFrame) {
+        console.log('[-] Smart Scanner could not find an iframe with video, defaulting to main page.');
+        targetFrame = videoPage.mainFrame();
+    }
+
+    // ⬛ IMMEDIATE BLACK BACKGROUND & FULLSCREEN FORCE (100% COPY PASTE FROM PROJECT 2)
     console.log('[*] Enforcing Black Background and Full Screen UI...');
     await videoPage.evaluate(() => {
         document.body.style.backgroundColor = 'black';
@@ -103,28 +130,25 @@ async function setupStream() {
         });
     }).catch(() => {});
 
-    for (const frame of videoPage.frames()) {
-        try {
-            await frame.evaluate(() => {
-                const style = document.createElement('style');
-                style.innerHTML = `.jw-controls, .jw-ui, .plyr__controls, .vjs-control-bar { display: none !important; }`;
-                document.head.appendChild(style);
+    await targetFrame.evaluate(async () => {
+        const style = document.createElement('style');
+        style.innerHTML = `.jw-controls, .jw-ui, .plyr__controls, .vjs-control-bar, [data-player] .controls { display: none !important; }`;
+        document.head.appendChild(style);
 
-                const video = document.querySelector('video');
-                if (video) {
-                    video.muted = true;
-                    video.style.position = 'fixed'; video.style.top = '0'; video.style.left = '0';
-                    video.style.width = '100vw'; video.style.height = '100vh';
-                    video.style.zIndex = '2147483647'; video.style.backgroundColor = 'black'; video.style.objectFit = 'contain';
-                }
-            });
-        } catch (e) {}
-    }
+        const video = document.querySelector('video');
+        if (video) { 
+            video.muted = false; // MUTE HATAYA
+            video.volume = 1.0; 
+            video.style.position = 'fixed'; video.style.top = '0'; video.style.left = '0';
+            video.style.width = '100vw'; video.style.height = '100vh';
+            video.style.zIndex = '2147483647'; video.style.backgroundColor = 'black'; video.style.objectFit = 'contain';
+        }
+    }).catch(()=>{});
 
     console.log('[✅] Stream is successfully set up!');
 }
 
-// 🎥 NEW FUNCTION: RECORD 20 SECONDS VIDEO FOR DEBUGGING
+// 🎥 RECORD 20 SECONDS VIDEO FOR DEBUGGING
 async function recordDebugVideo() {
     console.log(`\n--------------------------------------------------`);
     console.log(`[🎥] RECORDING 20-SECOND DEBUG VIDEO...`);
@@ -138,13 +162,10 @@ async function recordDebugVideo() {
     const displayNum = process.env.DISPLAY || ':99';
 
     try {
-        // FFmpeg command to record exactly 20 seconds (-t 20) of the virtual screen
         execSync(`ffmpeg -y -f x11grab -draw_mouse 0 -framerate 30 -video_size 1280x720 -i ${displayNum} -t 20 -c:v libx264 -preset ultrafast -pix_fmt yuv420p "${vidName}"`, { stdio: 'inherit' });
-        
         console.log(`[📤] Uploading Debug Video to GitHub Release...`);
         execSync(`gh release upload ${RELEASE_TAG} "${vidName}"`, { stdio: 'inherit' });
         console.log(`✅ [+] 20s Debug Video Uploaded Successfully! Dekhiye Release mein.`);
-
     } catch (err) {
         console.log(`[❌] Debug Video recording failed: ${err.message}`);
     }
@@ -156,6 +177,21 @@ async function captureAndUpload() {
     console.log(`\n--------------------------------------------------`);
     console.log(`--- 🔄 STARTING THUMBNAIL CYCLE #${cycleCounter} ---`);
     console.log(`--------------------------------------------------`);
+
+    // Smart Watchdog check from targetFrame
+    const status = await targetFrame.evaluate(() => {
+        const bodyText = document.body.innerText.toLowerCase();
+        if (bodyText.includes("stream error") || bodyText.includes("could not be loaded")) return 'CRITICAL_ERROR';
+        const v = document.querySelector('video');
+        if (!v || v.ended) return 'DEAD';
+        return 'HEALTHY';
+    }).catch(() => 'EVAL_ERROR');
+
+    if (status === 'CRITICAL_ERROR' || status === 'DEAD') {
+        console.log('\n[!] ❌ STREAM DEAD DETECTED! Skipping screenshot this cycle...');
+        cycleCounter++;
+        return;
+    }
 
     const uniqueTime = Date.now();
     const rawFrame = `temp_raw_${uniqueTime}.jpg`;
@@ -208,13 +244,9 @@ async function main() {
         console.log(`[✅] General release created successfully!`);
     } catch (e) {}
 
-    // STEP 3: Browser aur Stream Setup karo
     await setupStream();
-
-    // 🔥 STEP 4: PEHLE 20 SECONDS KI VIDEO RECORD KARO (Debugging ke liye)
     await recordDebugVideo();
 
-    // STEP 5: Thumbnail Loop start kardo
     while (true) {
         await captureAndUpload();
         await new Promise(resolve => setTimeout(resolve, WAIT_TIME_MS));
