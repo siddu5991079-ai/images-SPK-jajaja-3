@@ -22,7 +22,6 @@ let cycleCounter = 1;
 async function setupStream() {
     console.log(`[*] Starting browser with EXACT Project 2 Settings...`);
     
-    // 100% COPY PASTE FROM PROJECT 2
     browser = await puppeteer.launch({
         headless: false, 
         defaultViewport: { width: 1280, height: 720 },
@@ -44,7 +43,7 @@ async function setupStream() {
         if (p !== videoPage && p !== renderPage) await p.close();
     }
 
-    // 🛑 POPUP & REDIRECT BLOCKER (Project 2 Wali)
+    // 🛑 POPUP & REDIRECT BLOCKER
     browser.on('targetcreated', async (target) => {
         if (target.type() === 'page') {
             try {
@@ -61,39 +60,59 @@ async function setupStream() {
     console.log(`[*] Navigating to: ${TARGET_URL}`);
     await videoPage.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
     
-    // EXACT PROJECT 2 WAIT TIME
-    await new Promise(r => setTimeout(r, 5000));
+    // ⏳ INCREASED WAIT TIME FOR IFRAMES TO LOAD
+    console.log(`[*] Waiting 15 seconds for site and player to fully load...`);
+    await new Promise(r => setTimeout(r, 15000));
 
-    // 🖱️ THE TERMINATOR CLICKER (100% COPY PASTE FROM PROJECT 2)
-    console.log('[*] Hunting for the JW Player Play Button...');
-    let buttonGone = false;
-    let attempts = 0;
+    // 🖱️ THE TERMINATOR CLICKER (MULTI-CLICK / AD BYPASS MODE)
+    console.log('[*] Hunting for the JW Player Play Button (Multi-Click Mode)...');
     
-    while (!buttonGone && attempts < 15) {
-        buttonGone = true;
+    let maxClicks = 10; // Failsafe: Maximum 10 baar click try karega
+    let clickCount = 0;
+    let buttonStillVisible = true;
+    
+    while (buttonStillVisible && clickCount < maxClicks) {
+        buttonStillVisible = false; // Pehle maan lete hain ki button gayab ho gaya hai
+        
         for (const frame of videoPage.frames()) {
             try {
-                const playBtn = await frame.$('.jw-icon-display[aria-label="Play"]');
+                const playBtn = await frame.$('.jw-icon-display[aria-label="Play"], .jw-display-icon-container, [aria-label="Play"]');
+                
                 if (playBtn) {
+                    // Check karein ki button sach mein screen par dikh raha hai ya chhup gaya
                     const isVisible = await frame.evaluate(el => {
                         const style = window.getComputedStyle(el);
                         return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
                     }, playBtn);
 
                     if (isVisible) {
-                        buttonGone = false;
-                        console.log(`[*] Play button detected! Smashing it... (Attempt ${attempts + 1}/15)`);
+                        buttonStillVisible = true; 
+                        clickCount++;
+                        console.log(`[*] Play button visible! Smashing it... (Click #${clickCount})`);
+                        
+                        // Click karo! (Yeh ya toh ad khol dega ya video chala dega)
                         await frame.evaluate(el => el.click(), playBtn); 
-                        await new Promise(r => setTimeout(r, 2000));
-                        break; 
+                        
+                        // Wait karo taake agar naya tab khule toh blocker usko kill kar sake
+                        await new Promise(r => setTimeout(r, 2500)); 
+                        break; // Frame loop se bahar niklo aur dobara check karo
                     }
                 }
             } catch (err) {}
         }
-        attempts++;
     }
 
-    // 🧠 THE SMART SCANNER (100% COPY PASTE FROM PROJECT 2)
+    if (!buttonStillVisible) {
+        console.log(`[+] SUCCESS: Play button destroyed after ${clickCount} clicks. Video should be playing!`);
+    } else {
+        console.log(`[-] WARNING: Clicked ${maxClicks} times but play button is still there. Moving on...`);
+    }
+
+    // Video buffering ke liye thoda aur wait
+    console.log(`[*] Waiting 5 seconds for video buffer before scanning...`);
+    await new Promise(r => setTimeout(r, 5000));
+
+    // 🧠 THE SMART SCANNER
     console.log('[*] Scanning iframes for the REAL Live Stream Video...');
     targetFrame = null;
     for (const frame of videoPage.frames()) {
@@ -101,7 +120,7 @@ async function setupStream() {
             const isRealLiveStream = await frame.evaluate(() => {
                 const vid = document.querySelector('video');
                 if (!vid) return false;
-                if (vid.clientWidth < 100 || vid.clientHeight < 100) return false; 
+                if (vid.clientWidth < 50 || vid.clientHeight < 50) return false; 
                 return true; 
             });
 
@@ -118,7 +137,7 @@ async function setupStream() {
         targetFrame = videoPage.mainFrame();
     }
 
-    // ⬛ IMMEDIATE BLACK BACKGROUND & FULLSCREEN FORCE (100% COPY PASTE FROM PROJECT 2)
+    // ⬛ IMMEDIATE BLACK BACKGROUND & FULLSCREEN FORCE
     console.log('[*] Enforcing Black Background and Full Screen UI...');
     await videoPage.evaluate(() => {
         document.body.style.backgroundColor = 'black';
@@ -137,7 +156,7 @@ async function setupStream() {
 
         const video = document.querySelector('video');
         if (video) { 
-            video.muted = false; // MUTE HATAYA
+            video.muted = false; 
             video.volume = 1.0; 
             video.style.position = 'fixed'; video.style.top = '0'; video.style.left = '0';
             video.style.width = '100vw'; video.style.height = '100vh';
