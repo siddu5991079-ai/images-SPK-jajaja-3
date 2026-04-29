@@ -47,4 +47,4 @@ jobs:
         TARGET_URL: ${{ inputs.target_url }}
         IMAGE_PREFIX: ${{ inputs.image_prefix }}
       run: |
-        xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" node thumbnail_bot.js
+        xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac" node thumbnail_bot.js
