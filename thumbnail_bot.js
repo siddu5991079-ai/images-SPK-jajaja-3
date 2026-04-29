@@ -9,48 +9,51 @@ const fs = require('fs');
 // ⚙️ SETTINGS & ENVIRONMENT VARIABLES
 // ==========================================
 const TARGET_URL = process.env.TARGET_URL || 'https://dlstreams.com/watch.php?id=316';
-const IMAGE_PREFIX = process.env.IMAGE_PREFIX || 'Live_Thumbnail'; 
-const WAIT_TIME_MS = 30 * 1000; // 30 Seconds
-const RELEASE_TAG = 'live-match-updates'; 
+const IMAGE_PREFIX = process.env.IMAGE_PREFIX || 'Live_Thumbnail';
+const WAIT_TIME_MS = 30 * 1000;
+const RELEASE_TAG = 'live-match-updates';
 
 let browser = null;
 let videoPage = null;
-let renderPage = null; 
+let renderPage = null;
 let cycleCounter = 1;
 
 async function setupStream() {
-    console.log(`[*] Starting browser with EXACT Project 2 Settings...`);
+    console.log(`[*] Starting browser with CPU Rendering Settings...`);
     
     browser = await puppeteer.launch({
-        channel: 'chrome', 
-        headless: false, 
+        channel: 'chrome',
+        headless: false,
         defaultViewport: { width: 1280, height: 720 },
-        ignoreDefaultArgs: ['--enable-automation'], 
+        ignoreDefaultArgs: ['--enable-automation'],
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-accelerated-video-decode',
+            '--disable-software-rasterizer',
             '--window-size=1280,720',
-            '--kiosk', 
-            '--autoplay-policy=no-user-gesture-required'
+            '--kiosk',
+            '--autoplay-policy=no-user-gesture-required',
+            '--mute-audio'
         ]
     });
 
     videoPage = await browser.newPage();
-    renderPage = await browser.newPage(); 
+    renderPage = await browser.newPage();
 
     const pages = await browser.pages();
     for (const p of pages) {
         if (p !== videoPage && p !== renderPage) await p.close();
     }
 
-    // 🛑 POPUP & REDIRECT BLOCKER
     browser.on('targetcreated', async (target) => {
         if (target.type() === 'page') {
             try {
                 const newPage = await target.page();
                 if (newPage && newPage !== videoPage && newPage !== renderPage) {
-                    console.log(`[!] Ad Popup KILLED! Focus maintained on stream.`);
-                    await videoPage.bringToFront(); 
+                    await videoPage.bringToFront();
                     await newPage.close();
                 }
             } catch (e) {}
@@ -59,40 +62,46 @@ async function setupStream() {
 
     console.log(`[*] Navigating to: ${TARGET_URL}`);
     await videoPage.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await new Promise(r => setTimeout(r, 8000)); 
+    await new Promise(r => setTimeout(r, 8000));
 
-    // 🖱️ THE TERMINATOR CLICKER
     console.log('[*] Hunting for the Play Button...');
     for (let attempts = 0; attempts < 10; attempts++) {
         let clickedInThisAttempt = false;
         
         for (const frame of videoPage.frames()) {
             try {
-                const playBtn = await frame.$('.jw-icon-display[aria-label="Play"]');
-                if (playBtn) {
-                    const isVisible = await frame.evaluate(el => {
-                        const style = window.getComputedStyle(el);
-                        return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-                    }, playBtn);
-                    
-                    if (isVisible) {
-                        console.log(`[*] Play button smashed! (Attempt ${attempts + 1}/10)`);
-                        await frame.evaluate(el => el.click(), playBtn); 
+                // Aapka reference wala clicker method (direct bounding box click)
+                const iframeEl = await frame.frameElement();
+                if(iframeEl){
+                    const box = await iframeEl.boundingBox();
+                    if (box && box.width > 300) {
+                        console.log(`[*] Clicking middle of iframe...`);
+                        await videoPage.mouse.click(box.x + (box.width / 2), box.y + (box.height / 2), { delay: 100 });
                         clickedInThisAttempt = true;
-                        break; 
+                        break;
                     }
                 }
             } catch (err) {}
         }
         
         if (clickedInThisAttempt) {
-            await new Promise(r => setTimeout(r, 5000)); 
+            await new Promise(r => setTimeout(r, 4000));
         } else {
-            await new Promise(r => setTimeout(r, 2000)); 
+            await new Promise(r => setTimeout(r, 2000));
         }
     }
 
-    // ⬛ IMMEDIATE BLACK BACKGROUND & FULLSCREEN FORCE
+    // Force play & Fullscreen via evaluate (Just like reference code)
+    await videoPage.evaluate(() => {
+        document.querySelectorAll('iframe').forEach(f => {
+            try {
+                const doc = f.contentWindow.document;
+                const vid = doc.querySelector('video');
+                if(vid) vid.play().catch(()=>{});
+            } catch(e){}
+        });
+    });
+
     console.log('[*] Enforcing Black Background and Full Screen UI...');
     await videoPage.evaluate(() => {
         document.body.style.backgroundColor = 'black';
@@ -112,14 +121,14 @@ async function setupStream() {
                 document.head.appendChild(style);
 
                 const video = document.querySelector('video');
-                if (video) { 
-                    video.muted = true; 
+                if (video) {
+                    video.muted = true;
                     video.style.position = 'fixed'; video.style.top = '0'; video.style.left = '0';
                     video.style.width = '100vw'; video.style.height = '100vh';
                     video.style.zIndex = '2147483647'; video.style.backgroundColor = 'black'; video.style.objectFit = 'contain';
                 }
             });
-        } catch (e) {} 
+        } catch (e) {}
     }
 
     console.log('[✅] Stream is successfully set up! Starting Thumbnail Loop...');
@@ -140,7 +149,7 @@ async function captureAndUpload() {
             });
             if (status) {
                 isStreamHealthy = true;
-                break; 
+                break;
             }
         } catch (e) {}
     }
@@ -151,29 +160,13 @@ async function captureAndUpload() {
         return;
     }
 
-    const uniqueTime = Date.now(); 
+    const uniqueTime = Date.now();
     const rawFrame = `temp_raw_${uniqueTime}.jpg`;
     const finalImage = `${IMAGE_PREFIX}_${uniqueTime}.png`;
     
     try {
-        console.log(`[📸] Taking raw screenshot using FFmpeg (The Magic Fix)...`);
-        
-        await videoPage.bringToFront();
-        await new Promise(r => setTimeout(r, 1000));
-
-        const displayNum = process.env.DISPLAY || ':99';
-        
-        // 🔥 ERROR LOGGING ADDED HERE + FRAMERATE FIX
-        try {
-            execSync(`ffmpeg -y -f x11grab -draw_mouse 0 -framerate 1 -video_size 1280x720 -i ${displayNum} -vframes 1 "${rawFrame}"`, { stdio: 'pipe' });
-        } catch (ffmpegErr) {
-            console.log(`\n[❌ FFmpeg CRASH REPORT]:\n${ffmpegErr.stderr ? ffmpegErr.stderr.toString() : ffmpegErr.message}\n`);
-            throw new Error("FFmpeg failed to create the raw image. Check logs above.");
-        }
-
-        if (!fs.existsSync(rawFrame)) {
-            throw new Error("FFmpeg command ran but no image was saved.");
-        }
+        console.log(`[📸] Taking raw screenshot using Puppeteer...`);
+        await videoPage.screenshot({ path: rawFrame, type: 'jpeg', quality: 90 });
 
         console.log(`[🎨] Generating HD Thumbnail with template...`);
         const b64Image = "data:image/jpeg;base64," + fs.readFileSync(rawFrame).toString('base64');
@@ -182,7 +175,6 @@ async function captureAndUpload() {
 
         await renderPage.setViewport({ width: 1280, height: 720 });
         await renderPage.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
-        
         await renderPage.screenshot({ path: finalImage });
 
         console.log(`[📤] Uploading ${finalImage} to GitHub Release (${RELEASE_TAG})...`);
@@ -205,7 +197,7 @@ async function main() {
     try {
         execSync(`gh release delete ${RELEASE_TAG} --cleanup-tag -y`, { stdio: 'ignore' });
         console.log(`[✅] Old release deleted. Waiting 5 seconds...`);
-        await new Promise(r => setTimeout(r, 5000)); 
+        await new Promise(r => setTimeout(r, 5000));
     } catch (e) {
         console.log(`[ℹ️] No old release found to delete.`);
     }
@@ -214,7 +206,7 @@ async function main() {
     try {
         execSync(`gh release create ${RELEASE_TAG} --title "🔴 Live Match Updates" --notes "Auto generated thumbnails." --latest`, { stdio: 'inherit' });
         console.log(`[✅] General release created successfully!`);
-    } catch (e) { 
+    } catch (e) {
         console.log(`[⚠️] Release creation error (might already exist). Moving on...`);
     }
 
