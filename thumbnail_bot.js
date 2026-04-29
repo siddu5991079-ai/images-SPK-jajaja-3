@@ -5,6 +5,9 @@ puppeteer.use(StealthPlugin());
 const { execSync } = require('child_process');
 const fs = require('fs');
 
+// ==========================================
+// ⚙️ SETTINGS & ENVIRONMENT VARIABLES
+// ==========================================
 const TARGET_URL = process.env.TARGET_URL || 'https://dlstreams.com/watch.php?id=316';
 const IMAGE_PREFIX = process.env.IMAGE_PREFIX || 'Live_Thumbnail';
 const WAIT_TIME_MS = 30 * 1000;
@@ -82,7 +85,7 @@ async function setupStream() {
         }
         
         if (clickedInThisAttempt) {
-            await new Promise(r => setTimeout(r, 4000));
+            await new Promise(r => setTimeout(r, 5000));
         } else {
             await new Promise(r => setTimeout(r, 2000));
         }
@@ -118,7 +121,35 @@ async function setupStream() {
         } catch (e) {}
     }
 
-    console.log('[✅] Stream is successfully set up! Starting Thumbnail Loop...');
+    console.log('[✅] Stream is successfully set up!');
+}
+
+// 🎥 NEW FUNCTION: RECORD 20 SECONDS VIDEO FOR DEBUGGING
+async function recordDebugVideo() {
+    console.log(`\n--------------------------------------------------`);
+    console.log(`[🎥] RECORDING 20-SECOND DEBUG VIDEO...`);
+    console.log(`--------------------------------------------------`);
+    
+    await videoPage.bringToFront();
+    await new Promise(r => setTimeout(r, 1000));
+
+    const uniqueTime = Date.now();
+    const vidName = `debug_video_${uniqueTime}.mp4`;
+    const displayNum = process.env.DISPLAY || ':99';
+
+    try {
+        // FFmpeg command to record exactly 20 seconds (-t 20) of the virtual screen
+        execSync(`ffmpeg -y -f x11grab -draw_mouse 0 -framerate 30 -video_size 1280x720 -i ${displayNum} -t 20 -c:v libx264 -preset ultrafast -pix_fmt yuv420p "${vidName}"`, { stdio: 'inherit' });
+        
+        console.log(`[📤] Uploading Debug Video to GitHub Release...`);
+        execSync(`gh release upload ${RELEASE_TAG} "${vidName}"`, { stdio: 'inherit' });
+        console.log(`✅ [+] 20s Debug Video Uploaded Successfully! Dekhiye Release mein.`);
+
+    } catch (err) {
+        console.log(`[❌] Debug Video recording failed: ${err.message}`);
+    }
+
+    if (fs.existsSync(vidName)) fs.unlinkSync(vidName);
 }
 
 async function captureAndUpload() {
@@ -131,13 +162,11 @@ async function captureAndUpload() {
     const finalImage = `${IMAGE_PREFIX}_${uniqueTime}.png`;
     
     try {
-        console.log(`[📸] Taking raw screenshot using FFmpeg (The Only Proven Method)...`);
+        console.log(`[📸] Taking raw screenshot using FFmpeg...`);
         
-        // Ensure video is rendering on screen before capture
         await videoPage.bringToFront();
         await new Promise(r => setTimeout(r, 1000));
 
-        // 🔥 USE FFMPEG TO GRAB THE ACTUAL DISPLAY FRAME BUFFER
         const displayNum = process.env.DISPLAY || ':99';
         execSync(`ffmpeg -y -f x11grab -draw_mouse 0 -video_size 1280x720 -i ${displayNum} -vframes 1 "${rawFrame}"`, { stdio: 'pipe' });
 
@@ -148,7 +177,6 @@ async function captureAndUpload() {
 
         await renderPage.setViewport({ width: 1280, height: 720 });
         await renderPage.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
-        // Render page ka SS lene ke liye Puppeteer theek hai kyunke usme sirf image aur text hai, video nahi
         await renderPage.screenshot({ path: finalImage });
 
         console.log(`[📤] Uploading ${finalImage} to GitHub Release (${RELEASE_TAG})...`);
@@ -180,8 +208,13 @@ async function main() {
         console.log(`[✅] General release created successfully!`);
     } catch (e) {}
 
+    // STEP 3: Browser aur Stream Setup karo
     await setupStream();
 
+    // 🔥 STEP 4: PEHLE 20 SECONDS KI VIDEO RECORD KARO (Debugging ke liye)
+    await recordDebugVideo();
+
+    // STEP 5: Thumbnail Loop start kardo
     while (true) {
         await captureAndUpload();
         await new Promise(resolve => setTimeout(resolve, WAIT_TIME_MS));
