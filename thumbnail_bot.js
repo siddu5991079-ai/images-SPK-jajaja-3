@@ -1,4 +1,3 @@
-
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
@@ -17,7 +16,6 @@ let thumbnailInterval = null;
 // 🔄 MAIN LOOP
 // =========================================================================
 async function mainLoop() {
-    // 🧹 STEP 1: CLEANUP OLD RELEASE ON STARTUP
     await setupCleanRelease();
 
     while (true) {
@@ -56,7 +54,7 @@ async function startThumbnailBot() {
     console.log(`[*] Starting browser for Thumbnail Generation...`);
     
     browser = await puppeteer.launch({
-        headless: false, // Keep false if running with xvfb in GitHub Actions to ensure video plays
+        headless: false, 
         defaultViewport: { width: 1280, height: 720 },
         ignoreDefaultArgs: ['--enable-automation'], 
         args: [
@@ -65,7 +63,7 @@ async function startThumbnailBot() {
             '--window-size=1280,720',
             '--kiosk', 
             '--autoplay-policy=no-user-gesture-required',
-            '--mute-audio' // Muted audio since we don't need sound for thumbnails
+            '--mute-audio' 
         ]
     });
 
@@ -191,7 +189,7 @@ async function startThumbnailBot() {
             const b64Image = "data:image/jpeg;base64," + fs.readFileSync(rawFrame).toString('base64');
             const htmlCode = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&display=swap" rel="stylesheet"><style>body { margin: 0; width: 1280px; height: 720px; background: #0f0f0f; font-family: 'Roboto', sans-serif; color: white; display: flex; flex-direction: column; overflow: hidden; } .header { height: 100px; display: flex; align-items: center; padding: 0 40px; justify-content: space-between; z-index: 10; } .logo { font-size: 50px; font-weight: 900; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255,255,255,0.8); } .live-badge { border: 4px solid #cc0000; border-radius: 12px; padding: 5px 20px; font-size: 40px; font-weight: 700; display: flex; gap: 10px; } .hero-container { position: relative; width: 100%; height: 440px; } .hero-img { width: 100%; height: 100%; object-fit: cover; filter: blur(5px); opacity: 0.6; } .pip-img { position: absolute; top: 20px; right: 40px; width: 45%; border: 6px solid white; box-shadow: -15px 15px 30px rgba(0,0,0,0.8); } .text-container { position: relative; z-index: 999; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px 40px; } .main-title { font-size: 70px; font-weight: 900; line-height: 1.1; text-shadow: 6px 6px 15px rgba(0,0,0,0.9); } .live-text { color: #cc0000; }</style></head><body><div class="header"><div class="logo">SPORTSHUB</div><div class="live-badge"><span style="color:#cc0000">●</span> LIVE</div></div><div class="hero-container"><img src="${b64Image}" class="hero-img"><img src="${b64Image}" class="pip-img"></div><div class="text-container"><div class="main-title"><span class="live-text">🔴 Watch Live : </span>bulbul4u-live.xyz</div></div></body></html>`;
 
-            // 3. Render Template
+            // 3. Render Template (Design Image)
             const thumbBrowser = await puppeteer.launch({ 
                 headless: true, 
                 defaultViewport: { width: 1280, height: 720 },
@@ -199,23 +197,32 @@ async function startThumbnailBot() {
             });
             const thumbPage = await thumbBrowser.newPage();
             
+            // 🔥 YEH HAI AAPKI FINAL DESIGN IMAGE KA NAAM
             const outputImagePath = `${IMAGE_PREFIX}_${uniqueTime}.png`;
             await thumbPage.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
             await thumbPage.screenshot({ path: outputImagePath });
             await thumbBrowser.close(); 
 
-            fs.unlinkSync(rawFrame); 
-
-            // 4. Upload to GitHub
-            console.log(`[📤] Uploading designed thumbnail to Release...`);
+            // ❌ RAW IMAGE KO UPLOAD HONE SE PEHLE HI DELETE KAR DIYA JAYEGA
             try {
+                if (fs.existsSync(rawFrame)) fs.unlinkSync(rawFrame); 
+            } catch (e) { console.log("[⚠️] Failed to delete raw frame:", e.message) }
+
+            // 4. Upload ONLY the Designed Image to GitHub
+            console.log(`[📤] Uploading ONLY the designed thumbnail...`);
+            try {
+                // 🔥 GH RELEASE UPLOAD COMMAND MEIN SIRF DESIGN IMAGE BHEJI JAA RAHI HAI
                 execSync(`gh release upload ${RELEASE_TAG} "${outputImagePath}" --clobber`, { stdio: 'inherit' });
                 console.log(`[✅] Designed Thumbnail Successfully Uploaded!`);
             } catch (err) {
                 console.log(`[❌] Upload failed: ${err.message}`);
             }
 
-            if (fs.existsSync(outputImagePath)) fs.unlinkSync(outputImagePath); 
+            // ❌ UPLOAD KE BAAD DESIGN IMAGE KO BHI DELETE KAR DIYA JAYEGA (Space bachane ke liye)
+            try {
+                if (fs.existsSync(outputImagePath)) fs.unlinkSync(outputImagePath); 
+            } catch (e) { console.log("[⚠️] Failed to delete designed frame:", e.message) }
+            
             cycleCounter++;
 
         } catch (err) {
@@ -262,7 +269,7 @@ process.on('SIGINT', async () => {
 setTimeout(async () => {
     console.log("\n[*] 5h 50m completed! Triggering next action for overlap...");
     const repo = process.env.GITHUB_REPOSITORY;
-    const token = process.env.GH_PAT; // MAKES SURE GH_PAT is in your YAML env!
+    const token = process.env.GH_PAT; 
     const ref = process.env.GITHUB_REF_NAME || 'main';
     
     if (!repo || !token) return;
@@ -286,7 +293,6 @@ setTimeout(async () => {
 }, 21000000); 
 
 mainLoop();
-
 
 
 
