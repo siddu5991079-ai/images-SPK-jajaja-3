@@ -1,6 +1,61 @@
 
 
+name: 🎨 Thumbnail Generator Bot
 
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target Website URL'
+        required: true
+        default: 'https://dlstreams.com/watch.php?id=598'
+      image_prefix:
+        description: 'Image Name Start'
+        required: true
+        default: 'Live_Thumbnail'
+
+permissions:
+  contents: write 
+
+jobs:
+  run-thumbnail-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Install System Tools
+      run: |
+        sudo apt-get update
+        # FFmpeg aur PulseAudio ki ab zaroorat nahi hai thumbnails ke liye
+        sudo apt-get install -y google-chrome-stable xvfb dbus-x11
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm' # 🔥 Speed barhane ke liye cache add kiya hai
+
+    - name: Install Node Libraries
+      # puppeteer-screen-recorder hata diya hai kyunki hum recording nahi kar rahe
+      run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth --legacy-peer-deps
+
+    - name: Authenticate GitHub CLI
+      # Yahan secrets.GH_PAT use karein (jo aapne GitHub settings mein save kiya ho)
+      run: echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
+
+    - name: 🚀 Run Infinite Thumbnail Loop
+      env:
+        # 🔥 CRITICAL: GH_PAT yahan lazmi hai overlap trigger karne ke liye
+        GH_PAT: ${{ secrets.GH_PAT }} 
+        TARGET_URL: ${{ inputs.target_url }}
+        IMAGE_PREFIX: ${{ inputs.image_prefix }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Audio server ki ab zaroorat nahi, sirf Xvfb chahiye browser ke liye
+        xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac" node thumbnail_bot.js
 
 
 
@@ -43,60 +98,60 @@
 
 
 
-name: 🎨 Thumbnail Generator Bot
+# name: 🎨 Thumbnail Generator Bot
 
-on:
-  workflow_dispatch:
-    inputs:
-      target_url:
-        description: 'Target Website URL'
-        required: true
-        default: 'https://dlstreams.com/watch.php?id=598'
-      image_prefix:
-        description: 'Image Name Start (e.g., Match1, Live_Thumbnail)'
-        required: true
-        default: 'Live_Thumbnail'
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       target_url:
+#         description: 'Target Website URL'
+#         required: true
+#         default: 'https://dlstreams.com/watch.php?id=598'
+#       image_prefix:
+#         description: 'Image Name Start (e.g., Match1, Live_Thumbnail)'
+#         required: true
+#         default: 'Live_Thumbnail'
 
-permissions:
-  contents: write 
+# permissions:
+#   contents: write 
 
-jobs:
-  run-thumbnail-bot:
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
+# jobs:
+#   run-thumbnail-bot:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 360
 
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
+#     steps:
+#     - name: Checkout Code
+#       uses: actions/checkout@v3
 
-    # 🔥 EXACT PROJECT 2 SYSTEM TOOLS (Audio + FFmpeg)
-    - name: Install System Tools
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable xvfb ffmpeg pulseaudio dbus-x11
+#     # 🔥 EXACT PROJECT 2 SYSTEM TOOLS (Audio + FFmpeg)
+#     - name: Install System Tools
+#       run: |
+#         sudo apt-get update
+#         sudo apt-get install -y google-chrome-stable xvfb ffmpeg pulseaudio dbus-x11
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+#     - name: Setup Node.js
+#       uses: actions/setup-node@v3
+#       with:
+#         node-version: '18'
 
-    # ✅ FIXED: Added puppeteer-screen-recorder and --legacy-peer-deps to fix version conflict
-    - name: Install Node Libraries
-      run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-screen-recorder --legacy-peer-deps
+#     # ✅ FIXED: Added puppeteer-screen-recorder and --legacy-peer-deps to fix version conflict
+#     - name: Install Node Libraries
+#       run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-screen-recorder --legacy-peer-deps
 
-    - name: Authenticate GitHub CLI
-      run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+#     - name: Authenticate GitHub CLI
+#       run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-    - name: 🚀 Run Infinite Thumbnail Loop
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TARGET_URL: ${{ inputs.target_url }}
-        IMAGE_PREFIX: ${{ inputs.image_prefix }}
-      run: |
-        # 🔥 EXACT PROJECT 2 AUDIO SERVER STARTUP
-        pulseaudio -D --exit-idle-time=-1
-        pacmd load-module module-virtual-sink sink_name=v1
-        pacmd set-default-sink v1
-        pacmd set-default-source v1.monitor
+#     - name: 🚀 Run Infinite Thumbnail Loop
+#       env:
+#         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         TARGET_URL: ${{ inputs.target_url }}
+#         IMAGE_PREFIX: ${{ inputs.image_prefix }}
+#       run: |
+#         # 🔥 EXACT PROJECT 2 AUDIO SERVER STARTUP
+#         pulseaudio -D --exit-idle-time=-1
+#         pacmd load-module module-virtual-sink sink_name=v1
+#         pacmd set-default-sink v1
+#         pacmd set-default-source v1.monitor
         
-        xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac" node thumbnail_bot.js
+#         xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac" node thumbnail_bot.js
