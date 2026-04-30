@@ -4,20 +4,11 @@ puppeteer.use(StealthPlugin());
 
 const { spawn, execSync } = require('child_process'); 
 const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
-const fs = require('fs'); // 🔥 ADDED FS FOR THUMBNAIL EDITING
+const fs = require('fs');
 
-// 🚀 Multi-Stream Key Manager
-const STREAM_KEYS = {
-    '1': '14601603391083_14040893622891_puxzrwjniu', 
-    '2': '14601696583275_14041072274027_apdzpdb5xi', 
-    '3': '14617940008555_14072500914795_ohw67ls7ny',
-    '4': '14601972227691_14041593547371_obdhgewlmq',
-    '5': 'YOUR_STREAM_KEY_5_HERE'
-};
-
+// 🚀 Dynamic Stream Key Manager (Takes manual input from GitHub Actions)
 const TARGET_URL = process.env.TARGET_URL || 'https://dadocric.st/player.php?id=starsp3&v=m';
-const SELECTED_CHANNEL = process.env.OKRU_STREAM_ID || '1';
-const ACTIVE_STREAM_KEY = STREAM_KEYS[SELECTED_CHANNEL] || STREAM_KEYS['1'];
+const ACTIVE_STREAM_KEY = process.env.OKRU_STREAM_KEY || '14601603391083_14040893622891_puxzrwjniu';
 const RTMP_DESTINATION = `rtmp://vsu.okcdn.ru/input/${ACTIVE_STREAM_KEY}`;
 
 // 🔥 THUMBNAIL SETTINGS
@@ -26,7 +17,7 @@ const RELEASE_TAG = 'live-match-updates';
 
 let browser = null;
 let ffmpegProcess = null;
-let thumbnailInterval = null; // 🔥 INTERVAL VARIABLE
+let thumbnailInterval = null;
 
 // =========================================================================
 // 🔄 MAIN LOOP
@@ -69,17 +60,8 @@ async function setupCleanRelease() {
 
 async function startDirectStreaming() {
     console.log(`[*] Starting browser and FFmpeg...`);
-    
-    // ⚙️ SMART QUALITY SELECTOR
     const streamQuality = process.env.STREAM_QUALITY || '110KBps (Balanced 480p)';
-    let vBitrate = '800k', maxRate = '850k', bufSize = '1700k', resolution = '854:480', aBitrate = '64k';
-
-    if (streamQuality.includes('40KBps')) {
-        vBitrate = '300k'; maxRate = '350k'; bufSize = '700k'; resolution = '640:360'; aBitrate = '48k';
-    } else if (streamQuality.includes('20KBps')) {
-        vBitrate = '150k'; maxRate = '180k'; bufSize = '360k'; resolution = '426:240'; aBitrate = '32k';
-    }
-
+    
     browser = await puppeteer.launch({
         headless: false, 
         defaultViewport: { width: 1280, height: 720 },
@@ -116,7 +98,7 @@ async function startDirectStreaming() {
     console.log(`[*] Navigating to: ${TARGET_URL}`);
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // 🎥 1. START 30-SEC DEBUG RECORDING
+    // 🎥 1. START DEBUG RECORDING
     const recorder = new PuppeteerScreenRecorder(page, { followNewTab: false, fps: 30, videoFrame: { width: 1280, height: 720 } });
     console.log('[*] 🔴 Debug Recording Started...');
     await recorder.start('./recording.mp4');
@@ -204,16 +186,26 @@ async function startDirectStreaming() {
         }
     }).catch(()=>{});
 
-    // 📡 5. START FFMPEG BROADCAST (Dynamic Quality Applied Here)
-    console.log(`[+] Broadcasting to OK.ru CHANNEL: ${SELECTED_CHANNEL} - Selected Quality: ${streamQuality}`);
+    // 📡 5. START FFMPEG BROADCAST (WITH DYNAMIC QUALITY)
+    console.log(`[+] Broadcasting with Stream Key: ${ACTIVE_STREAM_KEY}`);
+    console.log(`[+] Quality Selected: ${streamQuality}`);
+    
     const displayNum = process.env.DISPLAY || ':99';
+    let scale = '854:480', bv = '800k', maxrate = '850k', bufsize = '1700k', ba = '64k'; // Default 110KBps
+
+    if (streamQuality.includes('40KBps')) {
+        scale = '640:360'; bv = '300k'; maxrate = '350k'; bufsize = '700k'; ba = '32k';
+    } else if (streamQuality.includes('20KBps')) {
+        scale = '426:240'; bv = '150k'; maxrate = '200k'; bufsize = '400k'; ba = '24k';
+    }
+
     let ffmpegArgs = [
         '-y', '-use_wallclock_as_timestamps', '1', '-thread_queue_size', '1024',
         '-f', 'x11grab', '-draw_mouse', '0', '-video_size', '1280x720', '-framerate', '30',
         '-i', displayNum, '-thread_queue_size', '1024', '-f', 'pulse', '-i', 'default',
-        '-vf', `scale=${resolution}`, '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'main',
-        '-b:v', vBitrate, '-maxrate', maxRate, '-bufsize', bufSize,
-        '-pix_fmt', 'yuv420p', '-g', '60', '-c:a', 'aac', '-b:a', aBitrate, '-ac', '2', '-ar', '44100',
+        '-vf', `scale=${scale}`, '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'main',
+        '-b:v', bv, '-maxrate', maxrate, '-bufsize', bufsize,
+        '-pix_fmt', 'yuv420p', '-g', '60', '-c:a', 'aac', '-b:a', ba, '-ac', '2', '-ar', '44100',
         '-async', '1', '-f', 'flv', RTMP_DESTINATION 
     ];
     
@@ -226,9 +218,9 @@ async function startDirectStreaming() {
     console.log('[*] Capturing stream for 30 seconds to finalize Debug Recording...');
     await new Promise(r => setTimeout(r, 30000));
     await recorder.stop();
-    console.log('[+] 30-Sec Debug Video Saved! Safe to cancel workflow anytime now.');
+    console.log('[+] 30-Sec Debug Video Saved!');
 
-    // 🎨🔥 6.5. THE 30-SECOND THUMBNAIL LOOP (Background Safe Method)
+    // 🎨🔥 6.5. THE 30-SECOND THUMBNAIL LOOP
     console.log('\n[*] 🔄 Starting 30-Second Thumbnail Generator Loop...');
     let cycleCounter = 1;
     
@@ -238,30 +230,26 @@ async function startDirectStreaming() {
             const uniqueTime = Date.now(); 
             const rawFrame = `temp_raw_frame_${uniqueTime}.jpg`;
             
-            // 1. Take raw screenshot from LIVE stream (No interference)
             await page.screenshot({ path: rawFrame, type: 'jpeg', quality: 90 });
             if (!fs.existsSync(rawFrame)) return;
 
-            // 2. Read base64
             const b64Image = "data:image/jpeg;base64," + fs.readFileSync(rawFrame).toString('base64');
             const htmlCode = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&display=swap" rel="stylesheet"><style>body { margin: 0; width: 1280px; height: 720px; background: #0f0f0f; font-family: 'Roboto', sans-serif; color: white; display: flex; flex-direction: column; overflow: hidden; } .header { height: 100px; display: flex; align-items: center; padding: 0 40px; justify-content: space-between; z-index: 10; } .logo { font-size: 50px; font-weight: 900; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255,255,255,0.8); } .live-badge { border: 4px solid #cc0000; border-radius: 12px; padding: 5px 20px; font-size: 40px; font-weight: 700; display: flex; gap: 10px; } .hero-container { position: relative; width: 100%; height: 440px; } .hero-img { width: 100%; height: 100%; object-fit: cover; filter: blur(5px); opacity: 0.6; } .pip-img { position: absolute; top: 20px; right: 40px; width: 45%; border: 6px solid white; box-shadow: -15px 15px 30px rgba(0,0,0,0.8); } .text-container { position: relative; z-index: 999; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px 40px; } .main-title { font-size: 70px; font-weight: 900; line-height: 1.1; text-shadow: 6px 6px 15px rgba(0,0,0,0.9); } .live-text { color: #cc0000; }</style></head><body><div class="header"><div class="logo">SPORTSHUB</div><div class="live-badge"><span style="color:#cc0000">●</span> LIVE</div></div><div class="hero-container"><img src="${b64Image}" class="hero-img"><img src="${b64Image}" class="pip-img"></div><div class="text-container"><div class="main-title"><span class="live-text">🔴 Watch Live : </span>bulbul4u-live.xyz</div></div></body></html>`;
 
-            // 3. SECRETE WEAPON: Start a hidden headless browser just for template rendering
             const thumbBrowser = await puppeteer.launch({ 
-                headless: true, // Invisible, won't cover X11 screen
+                headless: true, 
                 defaultViewport: { width: 1280, height: 720 },
                 args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
             });
             const thumbPage = await thumbBrowser.newPage();
             
-            const outputImagePath = `${IMAGE_PREFIX}_CH${SELECTED_CHANNEL}_${uniqueTime}.png`;
+            const outputImagePath = `${IMAGE_PREFIX}_${uniqueTime}.png`;
             await thumbPage.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
             await thumbPage.screenshot({ path: outputImagePath });
-            await thumbBrowser.close(); // Close immediately
+            await thumbBrowser.close(); 
 
-            fs.unlinkSync(rawFrame); // Delete raw image locally
+            fs.unlinkSync(rawFrame); 
 
-            // 4. Upload to GitHub
             console.log(`[📤] Uploading designed thumbnail to Release...`);
             try {
                 execSync(`gh release upload ${RELEASE_TAG} "${outputImagePath}" --clobber`, { stdio: 'inherit' });
@@ -270,15 +258,15 @@ async function startDirectStreaming() {
                 console.log(`[❌] Upload failed: ${err.message}`);
             }
 
-            if (fs.existsSync(outputImagePath)) fs.unlinkSync(outputImagePath); // Delete final image locally
+            if (fs.existsSync(outputImagePath)) fs.unlinkSync(outputImagePath); 
             cycleCounter++;
 
         } catch (err) {
             console.log(`[❌] Thumbnail error in Cycle #${cycleCounter}: ${err.message}`);
         }
-    }, 30000); // 30000 ms = 30 Seconds
+    }, 30000); 
 
-    // 🧠 7. THE SMART WATCHDOG (Privacy & Health Check Active...)
+    // 🧠 7. THE SMART WATCHDOG 
     console.log('\n[*] Smart Engine Connected! 24/7 Monitoring Active...');
     while (true) {
         if (!browser || !browser.isConnected()) throw new Error("Browser closed.");
@@ -301,7 +289,7 @@ async function startDirectStreaming() {
 }
 
 async function cleanup() {
-    if (thumbnailInterval) { clearInterval(thumbnailInterval); thumbnailInterval = null; } // 🔥 STOP THUMBNAIL LOOP ON RESTART
+    if (thumbnailInterval) { clearInterval(thumbnailInterval); thumbnailInterval = null; } 
     if (ffmpegProcess) { try { ffmpegProcess.kill('SIGKILL'); } catch(e){} ffmpegProcess = null; }
     if (browser) { try { await browser.close(); } catch(e){} browser = null; }
 }
@@ -331,9 +319,9 @@ setTimeout(async () => {
                 ref: ref,
                 inputs: {
                     target_url: process.env.TARGET_URL,
-                    okru_stream_channel: process.env.OKRU_STREAM_ID,
-                    stream_quality: process.env.STREAM_QUALITY,
-                    image_prefix: process.env.IMAGE_PREFIX || 'Live_Thumbnail' // 🔥 YAHAN NAAM AAGE BHEJ DIYA
+                    okru_stream_key: process.env.OKRU_STREAM_KEY, // 🔥 Passes manual key to next run
+                    stream_quality: process.env.STREAM_QUALITY,   // 🔥 Passes quality to next run
+                    image_prefix: process.env.IMAGE_PREFIX
                 }
             })
         });
@@ -344,7 +332,6 @@ setTimeout(async () => {
 }, 21000000); 
 
 mainLoop();
-
 
 
 
