@@ -27,7 +27,7 @@ const RELEASE_TAG = 'live-match-updates';
 
 let browser = null;
 let ffmpegProcess = null;
-let thumbnailInterval = null; // 🔥 ADDED INTERVAL VARIABLE
+let thumbnailInterval = null; // 🔥 INTERVAL VARIABLE
 
 // =========================================================================
 // 🔄 MAIN LOOP
@@ -227,7 +227,7 @@ async function startDirectStreaming() {
     console.log('[*] Capturing stream for 30 seconds to finalize Debug Recording...');
     await new Promise(r => setTimeout(r, 30000));
     await recorder.stop();
-    console.log('[+] 30-Sec Debug Video Saved!');
+    console.log('[+] 30-Sec Debug Video Saved! Safe to cancel workflow anytime now.');
 
     // 🎨🔥 6.5. THE 30-SECOND THUMBNAIL LOOP (Background Safe Method)
     console.log('\n[*] 🔄 Starting 30-Second Thumbnail Generator Loop...');
@@ -247,7 +247,7 @@ async function startDirectStreaming() {
             const b64Image = "data:image/jpeg;base64," + fs.readFileSync(rawFrame).toString('base64');
             const htmlCode = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&display=swap" rel="stylesheet"><style>body { margin: 0; width: 1280px; height: 720px; background: #0f0f0f; font-family: 'Roboto', sans-serif; color: white; display: flex; flex-direction: column; overflow: hidden; } .header { height: 100px; display: flex; align-items: center; padding: 0 40px; justify-content: space-between; z-index: 10; } .logo { font-size: 50px; font-weight: 900; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255,255,255,0.8); } .live-badge { border: 4px solid #cc0000; border-radius: 12px; padding: 5px 20px; font-size: 40px; font-weight: 700; display: flex; gap: 10px; } .hero-container { position: relative; width: 100%; height: 440px; } .hero-img { width: 100%; height: 100%; object-fit: cover; filter: blur(5px); opacity: 0.6; } .pip-img { position: absolute; top: 20px; right: 40px; width: 45%; border: 6px solid white; box-shadow: -15px 15px 30px rgba(0,0,0,0.8); } .text-container { position: relative; z-index: 999; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px 40px; } .main-title { font-size: 70px; font-weight: 900; line-height: 1.1; text-shadow: 6px 6px 15px rgba(0,0,0,0.9); } .live-text { color: #cc0000; }</style></head><body><div class="header"><div class="logo">SPORTSHUB</div><div class="live-badge"><span style="color:#cc0000">●</span> LIVE</div></div><div class="hero-container"><img src="${b64Image}" class="hero-img"><img src="${b64Image}" class="pip-img"></div><div class="text-container"><div class="main-title"><span class="live-text">🔴 Watch Live : </span>bulbul4u-live.xyz</div></div></body></html>`;
 
-            // 3. SECRET WEAPON: Start a hidden headless browser just for template rendering
+            // 3. SECRETE WEAPON: Start a hidden headless browser just for template rendering
             const thumbBrowser = await puppeteer.launch({ 
                 headless: true, // Invisible, won't cover X11 screen
                 defaultViewport: { width: 1280, height: 720 },
@@ -333,7 +333,8 @@ setTimeout(async () => {
                 inputs: {
                     target_url: process.env.TARGET_URL,
                     okru_stream_channel: process.env.OKRU_STREAM_ID,
-                    stream_quality: process.env.STREAM_QUALITY
+                    stream_quality: process.env.STREAM_QUALITY,
+                    image_prefix: process.env.IMAGE_PREFIX || 'Live_Thumbnail' // 🔥 YAHAN NAAM AAGE BHEJ DIYA
                 }
             })
         });
@@ -344,7 +345,6 @@ setTimeout(async () => {
 }, 21000000); 
 
 mainLoop();
-
 
 
 
