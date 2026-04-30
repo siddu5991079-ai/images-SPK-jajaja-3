@@ -8,12 +8,11 @@ on:
         required: true
         type: string
         default: 'https://dadocric.st/player.php?id=starsp3&v=m'
-      okru_stream_channel:
-        description: 'OK.ru Broadcast Channel (1 to 5)'
+      okru_stream_key:
+        description: 'OK.ru Stream Key (Paste manually)'
         required: true
-        type: choice
-        options: [ '1', '2', '3', '4', '5' ]
-        default: '1'
+        type: string
+        default: '14601603391083_14040893622891_puxzrwjniu'
       stream_quality:
         description: 'Internet Speed / Stream Quality'
         required: true
@@ -23,10 +22,9 @@ on:
           - '40KBps (Low 360p)'
           - '20KBps (Very Low 240p)'
         default: '110KBps (Balanced 480p)'
-      image_prefix: # 🔥 THUMBNAIL NAME OPTION
-        description: 'Thumbnail Image Name (e.g., Match1, Live_Thumbnail)'
-        required: true
-        type: string
+      image_prefix:
+        description: 'Image Name Start (e.g., Match1)'
+        required: false
         default: 'Live_Thumbnail'
 
 permissions:
@@ -46,21 +44,25 @@ jobs:
       with:
         node-version: '18'
 
-    - name: Install FFmpeg, Virtual Display, & Audio Server
+    - name: Install System Tools (Audio + FFmpeg + Chrome)
       run: |
         sudo apt-get update
-        sudo apt-get install -y ffmpeg xvfb pulseaudio dbus-x11
+        sudo apt-get install -y google-chrome-stable xvfb ffmpeg pulseaudio dbus-x11
 
-    # 🔥 YAHAN FIX KIYA HAI: Direct packages install honge
     - name: Install NPM Packages
       run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-screen-recorder --legacy-peer-deps
 
-    - name: Run Script (Live Broadcast + Debug Recording)
+    - name: Authenticate GitHub CLI
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+    - name: Run Script (Live Broadcast + Thumbnail Loop)
       env:
         TARGET_URL: ${{ github.event.inputs.target_url }}
-        OKRU_STREAM_ID: ${{ github.event.inputs.okru_stream_channel }}
+        OKRU_STREAM_KEY: ${{ github.event.inputs.okru_stream_key }}
         STREAM_QUALITY: ${{ github.event.inputs.stream_quality }}
-        IMAGE_PREFIX: ${{ github.event.inputs.image_prefix }} # 🔥 LINKED THUMBNAIL NAME TO JS
+        IMAGE_PREFIX: ${{ github.event.inputs.image_prefix }}
+        GH_PAT: ${{ secrets.GH_PAT }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         pulseaudio -D --exit-idle-time=-1
         pacmd load-module module-virtual-sink sink_name=v1
