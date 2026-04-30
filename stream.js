@@ -73,11 +73,14 @@ async function startDirectStreaming() {
     
     browser = await puppeteer.launch({
         headless: false, 
+        executablePath: '/usr/bin/google-chrome', // 🔥 FIX: Use system Chrome for stability
         defaultViewport: { width: 1280, height: 720 },
         ignoreDefaultArgs: ['--enable-automation'], 
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage', // 🔥 FIX: Prevents "hang" issue on GitHub Actions
+            '--disable-gpu',           // 🔥 FIX: Bypasses missing GPU in cloud
             '--window-size=1280,720',
             '--kiosk', 
             '--autoplay-policy=no-user-gesture-required'
@@ -247,8 +250,9 @@ async function startDirectStreaming() {
 
             const thumbBrowser = await puppeteer.launch({ 
                 headless: true, 
+                executablePath: '/usr/bin/google-chrome', // 🔥 FIX for thumbnail browser
                 defaultViewport: { width: 1280, height: 720 },
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] // 🔥 FIX for thumbnail browser
             });
             const thumbPage = await thumbBrowser.newPage();
             
