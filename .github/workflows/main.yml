@@ -8,11 +8,12 @@ on:
         required: true
         type: string
         default: 'https://dadocric.st/player.php?id=starsp3&v=m'
-      okru_stream_key:
-        description: 'OK.ru Stream Key (Paste manually)'
+      okru_stream_channel:
+        description: 'OK.ru Broadcast Channel (1 to 5)'
         required: true
-        type: string
-        default: '14601603391083_14040893622891_puxzrwjniu'
+        type: choice
+        options: [ '1', '2', '3', '4', '5' ]
+        default: '1'
       stream_quality:
         description: 'Internet Speed / Stream Quality'
         required: true
@@ -58,7 +59,7 @@ jobs:
     - name: Run Script (Live Broadcast + Thumbnail Loop)
       env:
         TARGET_URL: ${{ github.event.inputs.target_url }}
-        OKRU_STREAM_KEY: ${{ github.event.inputs.okru_stream_key }}
+        OKRU_STREAM_ID: ${{ github.event.inputs.okru_stream_channel }}
         STREAM_QUALITY: ${{ github.event.inputs.stream_quality }}
         IMAGE_PREFIX: ${{ github.event.inputs.image_prefix }}
         GH_PAT: ${{ secrets.GH_PAT }}
@@ -81,7 +82,6 @@ jobs:
         files: recording.mp4
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 
 
 
