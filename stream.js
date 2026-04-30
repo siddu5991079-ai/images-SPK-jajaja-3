@@ -6,9 +6,18 @@ const { spawn, execSync } = require('child_process');
 const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
 const fs = require('fs');
 
-// 🚀 Dynamic Stream Key Manager (Takes manual input from GitHub Actions)
+// 🚀 Multi-Stream Key Manager
+const STREAM_KEYS = {
+    '1': '14601603391083_14040893622891_puxzrwjniu', 
+    '2': '14601696583275_14041072274027_apdzpdb5xi', 
+    '3': '14617940008555_14072500914795_ohw67ls7ny',
+    '4': '14601972227691_14041593547371_obdhgewlmq',
+    '5': 'YOUR_STREAM_KEY_5_HERE'
+};
+
 const TARGET_URL = process.env.TARGET_URL || 'https://dadocric.st/player.php?id=starsp3&v=m';
-const ACTIVE_STREAM_KEY = process.env.OKRU_STREAM_KEY || '14601603391083_14040893622891_puxzrwjniu';
+const SELECTED_CHANNEL = process.env.OKRU_STREAM_ID || '1';
+const ACTIVE_STREAM_KEY = STREAM_KEYS[SELECTED_CHANNEL] || STREAM_KEYS['1'];
 const RTMP_DESTINATION = `rtmp://vsu.okcdn.ru/input/${ACTIVE_STREAM_KEY}`;
 
 // 🔥 THUMBNAIL SETTINGS
@@ -187,7 +196,7 @@ async function startDirectStreaming() {
     }).catch(()=>{});
 
     // 📡 5. START FFMPEG BROADCAST (WITH DYNAMIC QUALITY)
-    console.log(`[+] Broadcasting with Stream Key: ${ACTIVE_STREAM_KEY}`);
+    console.log(`[+] Broadcasting to OK.ru CHANNEL: ${SELECTED_CHANNEL}`);
     console.log(`[+] Quality Selected: ${streamQuality}`);
     
     const displayNum = process.env.DISPLAY || ':99';
@@ -243,7 +252,7 @@ async function startDirectStreaming() {
             });
             const thumbPage = await thumbBrowser.newPage();
             
-            const outputImagePath = `${IMAGE_PREFIX}_${uniqueTime}.png`;
+            const outputImagePath = `${IMAGE_PREFIX}_CH${SELECTED_CHANNEL}_${uniqueTime}.png`;
             await thumbPage.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
             await thumbPage.screenshot({ path: outputImagePath });
             await thumbBrowser.close(); 
@@ -319,8 +328,8 @@ setTimeout(async () => {
                 ref: ref,
                 inputs: {
                     target_url: process.env.TARGET_URL,
-                    okru_stream_key: process.env.OKRU_STREAM_KEY, // 🔥 Passes manual key to next run
-                    stream_quality: process.env.STREAM_QUALITY,   // 🔥 Passes quality to next run
+                    okru_stream_channel: process.env.OKRU_STREAM_ID, // 🔥 Passes channel 1-5 to next run
+                    stream_quality: process.env.STREAM_QUALITY,      // 🔥 Passes quality to next run
                     image_prefix: process.env.IMAGE_PREFIX
                 }
             })
