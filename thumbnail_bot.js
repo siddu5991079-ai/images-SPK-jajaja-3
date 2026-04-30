@@ -2,9 +2,9 @@ const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
-// 🔥 Added execSync here for GitHub release upload
 const { spawn, execSync } = require('child_process'); 
 const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
+const fs = require('fs'); // 🔥 ADDED FS FOR THUMBNAIL EDITING
 
 // 🚀 Multi-Stream Key Manager
 const STREAM_KEYS = {
@@ -20,13 +20,21 @@ const SELECTED_CHANNEL = process.env.OKRU_STREAM_ID || '1';
 const ACTIVE_STREAM_KEY = STREAM_KEYS[SELECTED_CHANNEL] || STREAM_KEYS['1'];
 const RTMP_DESTINATION = `rtmp://vsu.okcdn.ru/input/${ACTIVE_STREAM_KEY}`;
 
+// 🔥 THUMBNAIL SETTINGS
+const IMAGE_PREFIX = process.env.IMAGE_PREFIX || 'Live_Thumbnail';
+const RELEASE_TAG = 'live-match-updates'; 
+
 let browser = null;
 let ffmpegProcess = null;
+let thumbnailInterval = null; // 🔥 ADDED INTERVAL VARIABLE
 
 // =========================================================================
 // 🔄 MAIN LOOP
 // =========================================================================
 async function mainLoop() {
+    // 🧹 STEP 1: CLEANUP OLD RELEASE ON STARTUP
+    await setupCleanRelease();
+
     while (true) {
         try {
             await startDirectStreaming();
@@ -36,6 +44,26 @@ async function mainLoop() {
             await cleanup();
             await new Promise(resolve => setTimeout(resolve, 3000));
         }
+    }
+}
+
+// 📦 FUNCTION TO DELETE OLD IMAGES AND CREATE FRESH RELEASE
+async function setupCleanRelease() {
+    console.log(`\n[🧹] STEP 1: Cleaning up old GENERAL release...`);
+    try {
+        execSync(`gh release delete ${RELEASE_TAG} --cleanup-tag -y`, { stdio: 'ignore' });
+        console.log(`[✅] Old release deleted. Waiting 5 seconds for GitHub to sync...`);
+        await new Promise(r => setTimeout(r, 5000)); 
+    } catch (e) {
+        console.log(`[ℹ️] No old release found to delete.`);
+    }
+
+    console.log(`[📦] STEP 2: Creating a fresh, VISIBLE GENERAL Release...`);
+    try {
+        execSync(`gh release create ${RELEASE_TAG} --title "🔴 Live Match Updates" --notes "Auto uploaded custom thumbnails." --latest`, { stdio: 'inherit' });
+        console.log(`[✅] General release created successfully!`);
+    } catch (e) { 
+        console.log(`[⚠️] Release creation error (It might already exist). Moving on...`);
     }
 }
 
@@ -185,29 +213,61 @@ async function startDirectStreaming() {
         if (data.toString().includes('Error')) console.log(`[FFmpeg Error]: ${data}`);
     });
 
-    // ⏱️ 6. STOP RECORDING AFTER 10 SECONDS (Changed from 30)
+    // ⏱️ 6. STOP RECORDING AFTER 10 SECONDS
     console.log('[*] Capturing stream for 10 seconds to finalize Debug Recording...');
-    await new Promise(r => setTimeout(r, 10000)); // 10,000 milliseconds
+    await new Promise(r => setTimeout(r, 10000));
     await recorder.stop();
-    console.log('[+] 10-Sec Debug Video Saved! Safe to cancel workflow anytime now.');
+    console.log('[+] 10-Sec Debug Video Saved!');
 
-    // 📸 6.5. TAKE SCREENSHOT AND UPLOAD TO RELEASE
-    console.log('\n[*] 📸 Taking a screenshot of the playing stream...');
-    const screenshotName = `stream_screenshot_CH${SELECTED_CHANNEL}_${Date.now()}.png`;
-    const releaseTag = 'live-match-updates'; // Aap isko change kar sakte hain
+    // 🎨🔥 6.5. THE 30-SECOND THUMBNAIL LOOP (Background Safe Method)
+    console.log('\n[*] 🔄 Starting 30-Second Thumbnail Generator Loop...');
+    let cycleCounter = 1;
+    
+    thumbnailInterval = setInterval(async () => {
+        try {
+            console.log(`\n--- 🎨 THUMBNAIL CYCLE #${cycleCounter} ---`);
+            const uniqueTime = Date.now(); 
+            const rawFrame = `temp_raw_frame_${uniqueTime}.jpg`;
+            
+            // 1. Take raw screenshot from LIVE stream (No interference)
+            await page.screenshot({ path: rawFrame, type: 'jpeg', quality: 90 });
+            if (!fs.existsSync(rawFrame)) return;
 
-    try {
-        await page.screenshot({ path: screenshotName });
-        console.log(`[*] 📤 Uploading ${screenshotName} to GitHub Release (${releaseTag})...`);
-        
-        // Failsafe: Agar release nahi bani hui toh bana dega
-        try { execSync(`gh release create ${releaseTag} --title "Live Match Updates" --notes "Auto uploaded assets"`, { stdio: 'ignore' }); } catch(e){}
-        
-        execSync(`gh release upload ${releaseTag} "${screenshotName}" --clobber`, { stdio: 'inherit' });
-        console.log(`[✅] Screenshot successfully uploaded to GitHub Release!`);
-    } catch (err) {
-        console.log(`[❌] Error capturing or uploading screenshot: ${err.message}`);
-    }
+            // 2. Read base64
+            const b64Image = "data:image/jpeg;base64," + fs.readFileSync(rawFrame).toString('base64');
+            const htmlCode = `<!DOCTYPE html><html><head><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700;900&display=swap" rel="stylesheet"><style>body { margin: 0; width: 1280px; height: 720px; background: #0f0f0f; font-family: 'Roboto', sans-serif; color: white; display: flex; flex-direction: column; overflow: hidden; } .header { height: 100px; display: flex; align-items: center; padding: 0 40px; justify-content: space-between; z-index: 10; } .logo { font-size: 50px; font-weight: 900; letter-spacing: 1px; text-shadow: 0 0 10px rgba(255,255,255,0.8); } .live-badge { border: 4px solid #cc0000; border-radius: 12px; padding: 5px 20px; font-size: 40px; font-weight: 700; display: flex; gap: 10px; } .hero-container { position: relative; width: 100%; height: 440px; } .hero-img { width: 100%; height: 100%; object-fit: cover; filter: blur(5px); opacity: 0.6; } .pip-img { position: absolute; top: 20px; right: 40px; width: 45%; border: 6px solid white; box-shadow: -15px 15px 30px rgba(0,0,0,0.8); } .text-container { position: relative; z-index: 999; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px 40px; } .main-title { font-size: 70px; font-weight: 900; line-height: 1.1; text-shadow: 6px 6px 15px rgba(0,0,0,0.9); } .live-text { color: #cc0000; }</style></head><body><div class="header"><div class="logo">SPORTSHUB</div><div class="live-badge"><span style="color:#cc0000">●</span> LIVE</div></div><div class="hero-container"><img src="${b64Image}" class="hero-img"><img src="${b64Image}" class="pip-img"></div><div class="text-container"><div class="main-title"><span class="live-text">🔴 Watch Live : </span>bulbul4u-live.xyz</div></div></body></html>`;
+
+            // 3. SECRETE WEAPON: Start a hidden headless browser just for template rendering
+            const thumbBrowser = await puppeteer.launch({ 
+                headless: true, // Invisible, won't cover X11 screen
+                defaultViewport: { width: 1280, height: 720 },
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
+            });
+            const thumbPage = await thumbBrowser.newPage();
+            
+            const outputImagePath = `${IMAGE_PREFIX}_CH${SELECTED_CHANNEL}_${uniqueTime}.png`;
+            await thumbPage.setContent(htmlCode, { waitUntil: 'domcontentloaded' });
+            await thumbPage.screenshot({ path: outputImagePath });
+            await thumbBrowser.close(); // Close immediately
+
+            fs.unlinkSync(rawFrame); // Delete raw image locally
+
+            // 4. Upload to GitHub
+            console.log(`[📤] Uploading designed thumbnail to Release...`);
+            try {
+                execSync(`gh release upload ${RELEASE_TAG} "${outputImagePath}" --clobber`, { stdio: 'inherit' });
+                console.log(`[✅] Designed Thumbnail Successfully Uploaded!`);
+            } catch (err) {
+                console.log(`[❌] Upload failed: ${err.message}`);
+            }
+
+            if (fs.existsSync(outputImagePath)) fs.unlinkSync(outputImagePath); // Delete final image locally
+            cycleCounter++;
+
+        } catch (err) {
+            console.log(`[❌] Thumbnail error in Cycle #${cycleCounter}: ${err.message}`);
+        }
+    }, 30000); // 30000 ms = 30 Seconds
 
     // 🧠 7. THE SMART WATCHDOG (Privacy & Health Check Active...)
     console.log('\n[*] Smart Engine Connected! 24/7 Monitoring Active...');
@@ -232,6 +292,7 @@ async function startDirectStreaming() {
 }
 
 async function cleanup() {
+    if (thumbnailInterval) { clearInterval(thumbnailInterval); thumbnailInterval = null; } // 🔥 STOP THUMBNAIL LOOP ON RESTART
     if (ffmpegProcess) { try { ffmpegProcess.kill('SIGKILL'); } catch(e){} ffmpegProcess = null; }
     if (browser) { try { await browser.close(); } catch(e){} browser = null; }
 }
