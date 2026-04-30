@@ -36,7 +36,7 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '18'
-        cache: 'npm' # 🔥 Speed barhane ke liye cache add kiya hai
+        # cache: 'npm' # 🔥 Speed barhane ke liye cache add kiya hai
 
     - name: Install Node Libraries
       # puppeteer-screen-recorder hata diya hai kyunki hum recording nahi kar rahe
