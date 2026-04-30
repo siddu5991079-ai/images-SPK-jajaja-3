@@ -66,6 +66,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         pulseaudio -D --exit-idle-time=-1
+        sleep 2 # 🔥 FIX: Gives Audio server 2 seconds to wake up properly, preventing hangs
         pacmd load-module module-virtual-sink sink_name=v1
         pacmd set-default-sink v1
         pacmd set-default-source v1.monitor
