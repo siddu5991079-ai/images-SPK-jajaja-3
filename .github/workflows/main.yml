@@ -1,57 +1,177 @@
-name: 🎨 Thumbnail Generator Bot
+
+name: 24/7 Pro Stream Bot & Debugger
 
 on:
   workflow_dispatch:
     inputs:
       target_url:
-        description: 'Target Website URL'
+        description: 'Target Stream URL'
         required: true
-        default: 'https://dlstreams.com/watch.php?id=598'
-      image_prefix:
-        description: 'Image Name Start (e.g., Match1, Live_Thumbnail)'
+        type: string
+        default: 'https://dadocric.st/player.php?id=starsp3&v=m'
+      okru_stream_channel:
+        description: 'OK.ru Broadcast Channel (1 to 5)'
         required: true
-        default: 'Live_Thumbnail'
+        type: choice
+        options: [ '1', '2', '3', '4', '5' ]
+        default: '1'
+      stream_quality:
+        description: 'Internet Speed / Stream Quality'
+        required: true
+        type: choice
+        options: 
+          - '110KBps (Balanced 480p)'
+          - '40KBps (Low 360p)'
+          - '20KBps (Very Low 240p)'
+        default: '110KBps (Balanced 480p)'
 
 permissions:
-  contents: write 
+  contents: write
 
 jobs:
-  run-thumbnail-bot:
+  stream-and-record:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 360 # 6 Hours Limit
 
     steps:
-    - name: Checkout Code
+    - name: Get Code
       uses: actions/checkout@v3
-
-    # 🔥 EXACT PROJECT 2 SYSTEM TOOLS (Audio + FFmpeg)
-    - name: Install System Tools
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable xvfb ffmpeg pulseaudio dbus-x11
 
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18'
 
-    # ✅ FIXED: Added puppeteer-screen-recorder and --legacy-peer-deps to fix version conflict
-    - name: Install Node Libraries
-      run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-screen-recorder --legacy-peer-deps
-
-    - name: Authenticate GitHub CLI
-      run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-
-    - name: 🚀 Run Infinite Thumbnail Loop
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TARGET_URL: ${{ inputs.target_url }}
-        IMAGE_PREFIX: ${{ inputs.image_prefix }}
+    - name: Install FFmpeg, Virtual Display, & Audio Server
       run: |
-        # 🔥 EXACT PROJECT 2 AUDIO SERVER STARTUP
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg xvfb pulseaudio dbus-x11
+
+    - name: Install NPM Packages
+      run: npm install
+
+    - name: Run Script (Live Broadcast + Debug Recording)
+      env:
+        TARGET_URL: ${{ github.event.inputs.target_url }}
+        OKRU_STREAM_ID: ${{ github.event.inputs.okru_stream_channel }}
+        STREAM_QUALITY: ${{ github.event.inputs.stream_quality }}
+      run: |
         pulseaudio -D --exit-idle-time=-1
         pacmd load-module module-virtual-sink sink_name=v1
         pacmd set-default-sink v1
         pacmd set-default-source v1.monitor
+        xvfb-run -s "-screen 0 1280x720x24 -ac" node stream.js
+
+    # 🚀 MAGIC UPLOAD TO RELEASES (Run Even if Cancelled!)
+    - name: Upload Debug Video to GitHub Releases
+      if: always() 
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: "broadcast-${{ github.run_id }}"
+        name: "Broadcast Debug Log - ${{ github.run_id }}"
+        body: "First 30 seconds of the broadcast. Shows if the auto-clicker successfully bypassed ads."
+        files: recording.mp4
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# // ================= ALhamdullah both done in one repo, live broadcast to the ok.ru and also thumbnail =============================================
+
+
+
+# name: 🎨 Thumbnail Generator Bot
+
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       target_url:
+#         description: 'Target Website URL'
+#         required: true
+#         default: 'https://dlstreams.com/watch.php?id=598'
+#       image_prefix:
+#         description: 'Image Name Start (e.g., Match1, Live_Thumbnail)'
+#         required: true
+#         default: 'Live_Thumbnail'
+
+# permissions:
+#   contents: write 
+
+# jobs:
+#   run-thumbnail-bot:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 360
+
+#     steps:
+#     - name: Checkout Code
+#       uses: actions/checkout@v3
+
+#     # 🔥 EXACT PROJECT 2 SYSTEM TOOLS (Audio + FFmpeg)
+#     - name: Install System Tools
+#       run: |
+#         sudo apt-get update
+#         sudo apt-get install -y google-chrome-stable xvfb ffmpeg pulseaudio dbus-x11
+
+#     - name: Setup Node.js
+#       uses: actions/setup-node@v3
+#       with:
+#         node-version: '18'
+
+#     # ✅ FIXED: Added puppeteer-screen-recorder and --legacy-peer-deps to fix version conflict
+#     - name: Install Node Libraries
+#       run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-screen-recorder --legacy-peer-deps
+
+#     - name: Authenticate GitHub CLI
+#       run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+#     - name: 🚀 Run Infinite Thumbnail Loop
+#       env:
+#         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         TARGET_URL: ${{ inputs.target_url }}
+#         IMAGE_PREFIX: ${{ inputs.image_prefix }}
+#       run: |
+#         # 🔥 EXACT PROJECT 2 AUDIO SERVER STARTUP
+#         pulseaudio -D --exit-idle-time=-1
+#         pacmd load-module module-virtual-sink sink_name=v1
+#         pacmd set-default-sink v1
+#         pacmd set-default-source v1.monitor
         
-        xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac" node thumbnail_bot.js
+#         xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac" node thumbnail_bot.js
