@@ -51,8 +51,9 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y ffmpeg xvfb pulseaudio dbus-x11
 
+    # 🔥 YAHAN FIX KIYA HAI: Direct packages install honge
     - name: Install NPM Packages
-      run: npm install
+      run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-screen-recorder --legacy-peer-deps
 
     - name: Run Script (Live Broadcast + Debug Recording)
       env:
@@ -78,7 +79,6 @@ jobs:
         files: recording.mp4
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
 
 
 
