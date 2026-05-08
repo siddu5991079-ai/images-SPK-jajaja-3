@@ -1,61 +1,61 @@
 
 
-name: 🎨 Thumbnail Generator Bot
+# name: 🎨 Thumbnail Generator Bot
 
-on:
-  workflow_dispatch:
-    inputs:
-      target_url:
-        description: 'Target Website URL'
-        required: true
-        default: 'https://dlstreams.com/watch.php?id=598'
-      image_prefix:
-        description: 'Image Name Start'
-        required: true
-        default: 'Live_Thumbnail'
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       target_url:
+#         description: 'Target Website URL'
+#         required: true
+#         default: 'https://dlstreams.com/watch.php?id=598'
+#       image_prefix:
+#         description: 'Image Name Start'
+#         required: true
+#         default: 'Live_Thumbnail'
 
-permissions:
-  contents: write 
+# permissions:
+#   contents: write 
 
-jobs:
-  run-thumbnail-bot:
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
+# jobs:
+#   run-thumbnail-bot:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 360
 
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
+#     steps:
+#     - name: Checkout Code
+#       uses: actions/checkout@v3
 
-    - name: Install System Tools
-      run: |
-        sudo apt-get update
-        # FFmpeg aur PulseAudio ki ab zaroorat nahi hai thumbnails ke liye
-        sudo apt-get install -y google-chrome-stable xvfb dbus-x11
+#     - name: Install System Tools
+#       run: |
+#         sudo apt-get update
+#         # FFmpeg aur PulseAudio ki ab zaroorat nahi hai thumbnails ke liye
+#         sudo apt-get install -y google-chrome-stable xvfb dbus-x11
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        # cache: 'npm' # 🔥 Speed barhane ke liye cache add kiya hai
+#     - name: Setup Node.js
+#       uses: actions/setup-node@v3
+#       with:
+#         node-version: '18'
+#         # cache: 'npm' # 🔥 Speed barhane ke liye cache add kiya hai
 
-    - name: Install Node Libraries
-      # puppeteer-screen-recorder hata diya hai kyunki hum recording nahi kar rahe
-      run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth --legacy-peer-deps
+#     - name: Install Node Libraries
+#       # puppeteer-screen-recorder hata diya hai kyunki hum recording nahi kar rahe
+#       run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth --legacy-peer-deps
 
-    - name: Authenticate GitHub CLI
-      # Yahan secrets.GH_PAT use karein (jo aapne GitHub settings mein save kiya ho)
-      run: echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
+#     - name: Authenticate GitHub CLI
+#       # Yahan secrets.GH_PAT use karein (jo aapne GitHub settings mein save kiya ho)
+#       run: echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
 
-    - name: 🚀 Run Infinite Thumbnail Loop
-      env:
-        # 🔥 CRITICAL: GH_PAT yahan lazmi hai overlap trigger karne ke liye
-        GH_PAT: ${{ secrets.GH_PAT }} 
-        TARGET_URL: ${{ inputs.target_url }}
-        IMAGE_PREFIX: ${{ inputs.image_prefix }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        # Audio server ki ab zaroorat nahi, sirf Xvfb chahiye browser ke liye
-        xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac" node thumbnail_bot.js
+#     - name: 🚀 Run Infinite Thumbnail Loop
+#       env:
+#         # 🔥 CRITICAL: GH_PAT yahan lazmi hai overlap trigger karne ke liye
+#         GH_PAT: ${{ secrets.GH_PAT }} 
+#         TARGET_URL: ${{ inputs.target_url }}
+#         IMAGE_PREFIX: ${{ inputs.image_prefix }}
+#         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#       run: |
+#         # Audio server ki ab zaroorat nahi, sirf Xvfb chahiye browser ke liye
+#         xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24 -ac" node thumbnail_bot.js
 
 
 
